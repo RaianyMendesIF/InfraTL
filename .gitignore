@@ -1,0 +1,54 @@
+# --- Ambientes Virtuais ---
+venv/
+.venv/
+env/
+ENV/
+bin/
+lib/
+include/
+
+# --- Python (Arquivos temporários) ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# --- Variáveis de Ambiente (SEGURANÇA!) ---
+# Nunca suba suas senhas de banco de dados para o Git
+.env
+.flaskenv
+env.txt
+
+# --- Banco de Dados ---
+# Se usar SQLite, ignore o arquivo do banco
+*.sqlite3
+*.db
+
+# --- Windows ---
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# --- VS Code ---
+.vscode/
+.history/
+*.code-workspace
+
+# --- PyCharm ---
+.idea/
