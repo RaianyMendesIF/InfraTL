@@ -4,6 +4,7 @@ SISTEMAS INTELIGENTE DE ZELADORIA URBANA
 python -m venv venv
 
 - Windows: .\venv\Scripts\activate
+- Windows: deactivate
 
 - Linux/Mac: source venv/bin/activate
 
