@@ -1,11 +1,18 @@
 # main.py
 from fastapi import FastAPI  
-  
-from views.car_view import router_car  
-  
 app = FastAPI()  
+ 
+from views.ocorrencia.admin.admin import router_occurrence_admin
+from views.ocorrencia.public.public import router_occurrence_public
+from views.auth.login.login import router_login
+from views.auth.signup.signup import router_signup
   
-app.router.include_router(router_car, prefix="/api/v1", tags=["car"])  
+
+  
+app.include_router(router_occurrence_admin)  
+app.include_router(router_occurrence_public)  
+app.include_router(router_signup)  
+app.include_router(router_login)  
   
 if __name__ == "__main__":  
     import uvicorn  
