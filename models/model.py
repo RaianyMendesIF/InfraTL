@@ -1,6 +1,7 @@
-from sqlalchemy import Column, String, Integer, Boolean, Float, ForeignKey
+from sqlalchemy import Column, String, Integer, Boolean, Float, ForeignKey, DateTime
 from sqlalchemy.orm import declarative_base
 from sqlalchemy_utils.types import ChoiceType
+from datetime import datetime
 
 Base = declarative_base()
 
@@ -98,10 +99,10 @@ class Ocorrencia(Base):
     __tablename__ = "ocorrencia"
     
     STATUS_PEDIDOS = (
-        ("PENDENTE", "PENDENTE")
-        ("EM ANDAMENTO", "EM ANDAMENTO")
-        ("FINALIZADO", "FINALIZADO")
-        ("CANCELADO", "CANCELADO")
+        ("PENDENTE", "PENDENTE"),
+        ("EM ANDAMENTO", "EM ANDAMENTO"),
+        ("FINALIZADO", "FINALIZADO"),
+        ("CANCELADO", "CANCELADO"),
     )
     
     id = Column("id", Integer, primary_key=True, autoincrement=True)
@@ -109,16 +110,38 @@ class Ocorrencia(Base):
     descricao = Column("descricao", String, nullable=False)
     status = Column("status", ChoiceType(choices=STATUS_PEDIDOS))
     urgencia = Column("urgencia", Boolean, default=False)
+    data_abertura = Column("data_abertura", DateTime, default=datetime.now, nullable=False)
+    data_fechamento = Column("data_fechamento", DateTime)
     id_cidadao = Column("cidadao", ForeignKey("cidadao.id"))
     id_funcionario = Column("funcionario", ForeignKey("funcionario.id"))
     id_endereco = Column("endereco", ForeignKey("endereco.id"))
     
-    def __init__(self, titulo, descricao, urgencia, id_cidadao, id_funcionario, id_endereco, status="PENDENTE"):
+    def __init__(self, titulo, descricao, urgencia, data_fechamento, id_cidadao, id_funcionario, id_endereco, status="PENDENTE"):
         self.titulo = titulo
         self.descricao = descricao
         self.status = status
         self.urgencia = urgencia
+        self.data_fechamento = data_fechamento
         self.id_cidadao = id_cidadao
         self.id_funcionario = id_funcionario
         self.id_endereco = id_endereco
+        
+    def fechar_ocorrencia(self):
+        self.status = "FINALIZADO"
+        self.data_fechamento = datetime.now()
     
+    
+class Historico_Ocorrencia(Base):
+    __tablename__ = "historico_ocorrencia"
+    
+    id = Column("id", Integer, primary_key=True, autoincrement=True)
+    data = Column("data", DateTime, default=datetime.now)
+    mensagem = Column("mensagem", String, nullable=False)
+    status = Column("status", String, nullable=False)
+    id_ocorrencia = Column("id_ocorrencia", ForeignKey("ocorrencia.id"), nullable=False)
+    
+    def __init__(self, mensagem, status, id_ocorrencia):
+        self.mensagem = mensagem
+        self.status = status
+        self.id_ocorrencia = id_ocorrencia
+        
