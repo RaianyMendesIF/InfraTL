@@ -144,4 +144,8 @@ class Historico_Ocorrencia(Base):
         self.mensagem = mensagem
         self.status = status
         self.id_ocorrencia = id_ocorrencia
-        
+
+
+class Servico_Ocorrencia:
+    pass
+
