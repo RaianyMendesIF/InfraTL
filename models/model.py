@@ -15,7 +15,7 @@ class Usuario(Base):
     id = Column("id", Integer, primary_key=True, autoincrement=True)
     nome = Column("nome", String)
     email = Column("email", String, nullable=False)
-    senha = Column("senha", String, nullable=False)
+    senha_hash = Column("senha_hash", String, nullable=False)
     ativo = Column("ativo", Boolean)
     admin = Column("admin", Boolean, default=False)
     
@@ -29,7 +29,7 @@ class Usuario(Base):
     def __init__(self, nome, email, senha, ativo=True, admin=False):
         self.nome = nome
         self.email = email
-        self.senha = pwd_context.hash(senha)
+        self.senha_hash = pwd_context.hash(senha)
         self.ativo = ativo
         self.admin = admin
         
@@ -85,6 +85,9 @@ class Endereco(Base):
     rua = Column("rua", String, nullable=False)
     numero = Column("numero", Integer)
     complemento = Column("complemento", String, default=None)
+    latitude = Column('latitude', Float, default=None)
+    longitude = Column('longitude', Float, default=None)
+    fonte_localizacao = Column('fonte_localizacao', String, default='manual')
     
     def __init__(self, bairro, rua, numero, complemento = None):
         self.bairro = bairro
@@ -129,7 +132,7 @@ class Ocorrencia(Base):
     id_funcionario = Column("funcionario", ForeignKey("funcionario.id"))
     id_endereco = Column("endereco", ForeignKey("endereco.id"))
     
-    def __init__(self, titulo, descricao, urgencia, data_fechamento, id_cidadao, id_funcionario, id_endereco, status="PENDENTE"):
+    def __init__(self, titulo, descricao, urgencia, data_fechamento, id_cidadao, id_funcionario, id_endereco, status="Em_Analise"):
         self.titulo = titulo
         self.descricao = descricao
         self.status = status
@@ -140,7 +143,7 @@ class Ocorrencia(Base):
         self.id_endereco = id_endereco
         
     def fechar_ocorrencia(self):
-        self.status = "FINALIZADO"
+        self.status = "Finalizado"
         self.data_fechamento = datetime.now()
     
     
@@ -160,5 +163,11 @@ class Historico_Ocorrencia(Base):
 
 
 class Servico_Ocorrencia:
-    pass
+    __tablename__ = 'servico'
+
+    id = Column("id", Integer, primary_key=True, autoincrement=True)
+    nome = Column("nome", String, nullable=False)
+    descricao = Column("descricao", String)
+    prazo_estimado_dias = Column("prazo_estimado_dias", Integer)
+    ativo = Column("ativo", Boolean, default=True)
 
