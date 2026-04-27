@@ -1,10 +1,12 @@
-from sqlalchemy import Column, String, Integer, Boolean, Float, ForeignKey, DateTime
+from sqlalchemy import Column, String, Integer, Boolean, Float, ForeignKey, DateTime, Date, Enum
 from sqlalchemy.orm import declarative_base
 from sqlalchemy_utils.types import ChoiceType
 from datetime import datetime
+from passlib.context import CryptContext
+
 
 Base = declarative_base()
-
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 class Usuario(Base):
@@ -27,9 +29,18 @@ class Usuario(Base):
     def __init__(self, nome, email, senha, ativo=True, admin=False):
         self.nome = nome
         self.email = email
-        self.senha = senha
+        self.senha = pwd_context.hash(senha)
         self.ativo = ativo
         self.admin = admin
+        
+        
+    def verificar_senha(self, senha_pura):
+        """Método útil para validar a senha durante o login.
+        Adicionei esse método porque, uma vez que a senha é hasheada,
+        você não consegue mais ler o valor original. Para logar o usuário depois,
+        você precisará usar o pwd_context.verify
+        """
+        return pwd_context.verify(senha_pura, self.senha)
         
         
         
@@ -38,7 +49,10 @@ class Usuario(Base):
 class Cidadao(Usuario):
     __tablename__ = "cidadao"
     
-    id = Column("id", Integer, ForeignKey("usuario.id"), primary_key=True)  
+    id = Column("id", Integer, ForeignKey("usuario.id"), primary_key=True)
+    cpf = Column('cpf', String(11), nullable=False, unique=True)
+    telefone = Column('telefone', String(15))
+    data_nascimento = Column('data_nascimento', Date, nullable=False)  
     
     __mapper_args__ = {
         "polymorphic_identity": "cidadao",
@@ -67,14 +81,12 @@ class Endereco(Base):
     __tablename__ = "endereco"
     
     id = Column("id", Integer, primary_key=True, autoincrement=True)
-    cep = Column("cep", String, nullable=False)
     bairro = Column("bairro", ForeignKey("bairro.id"), nullable=False)
     rua = Column("rua", String, nullable=False)
     numero = Column("numero", Integer)
     complemento = Column("complemento", String, default=None)
     
-    def __init__(self, cep, bairro, rua, numero, complemento = None):
-        self.cep = cep
+    def __init__(self, bairro, rua, numero, complemento = None):
         self.bairro = bairro
         self.rua = rua
         self.numero = numero
@@ -99,17 +111,18 @@ class Ocorrencia(Base):
     __tablename__ = "ocorrencia"
     
     STATUS_PEDIDOS = (
-        ("PENDENTE", "PENDENTE"),
-        ("EM ANDAMENTO", "EM ANDAMENTO"),
-        ("FINALIZADO", "FINALIZADO"),
-        ("CANCELADO", "CANCELADO"),
+        ("Em_Analise", "Em_Analise"),
+        ("Pendente", "Pendente"),
+        ("Em_Execucao", "Em_Execucao"),
+        ("Finalizado", "Finalizado"),
+        ("Arquivado", "Arquivado"),
     )
     
     id = Column("id", Integer, primary_key=True, autoincrement=True)
     titulo = Column("titulo", String, nullable=False)
     descricao = Column("descricao", String, nullable=False)
     status = Column("status", ChoiceType(choices=STATUS_PEDIDOS))
-    urgencia = Column("urgencia", Boolean, default=False)
+    urgencia = Column(Enum("Baixa", "Media", "Alta", "Critica", name="urgencia"), nullable=True)
     data_abertura = Column("data_abertura", DateTime, default=datetime.now, nullable=False)
     data_fechamento = Column("data_fechamento", DateTime)
     id_cidadao = Column("cidadao", ForeignKey("cidadao.id"))
