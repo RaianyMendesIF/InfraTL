@@ -17,4 +17,5 @@ async def criar_conta(dados: SignupRequest, session = Depends(pegar_sessao)):
         return{"mensagem": "Usuario cadastrado com sucesso"}
     except Exception as e:
         session.rollback()
-        return {"erro": f"Erro ao salvar no banco: {str(e)}"}
+        print(f"ERRO DE BANCO: {e}") # Isso aparecerá no seu terminal
+        return {"status": 500, "detalhe_tecnico": str(e)}
