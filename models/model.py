@@ -1,9 +1,13 @@
-from sqlalchemy import Column, String, Integer, Boolean, Float, ForeignKey, DateTime, Date, Enum
+from sqlalchemy import create_engine, Column, String, Integer, Boolean, Float, ForeignKey, DateTime, Date, Enum
 from sqlalchemy.orm import declarative_base
 from sqlalchemy_utils.types import ChoiceType
 from datetime import datetime
 from passlib.context import CryptContext
+import enum
 
+URL_BANCO = "postgresql://neondb_owner:npg_AiVogyHYIL34@ep-noisy-cherry-acnubdfk.sa-east-1.aws.neon.tech/neondb?sslmode=require"
+
+db = create_engine(URL_BANCO)
 
 Base = declarative_base()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
