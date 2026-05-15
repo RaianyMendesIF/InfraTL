@@ -1,7 +1,12 @@
 # main.py
-from fastapi import FastAPI  
-app = FastAPI()  
- 
+from fastapi import FastAPI
+from models.model import Base, db
+
+app = FastAPI()
+
+# Criar todas as tabelas no banco de dados
+Base.metadata.create_all(bind=db)
+
 from views.ocorrencia.admin import router_occurrence_admin
 from views.ocorrencia.public import router_occurrence_public
 from views.auth.login import router_login

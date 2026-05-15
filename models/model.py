@@ -1,23 +1,35 @@
-from sqlalchemy import Column, String, Integer, Boolean, Float, ForeignKey, DateTime, Date, Enum
+from sqlalchemy import create_engine, Column, String, Integer, Boolean, Float, ForeignKey, DateTime, Date, Enum
 from sqlalchemy.orm import declarative_base
-from sqlalchemy_utils.types import ChoiceType
 from datetime import datetime
 from passlib.context import CryptContext
+import enum
 
+URL_BANCO = "postgresql://neondb_owner:npg_AiVogyHYIL34@ep-noisy-cherry-acnubdfk.sa-east-1.aws.neon.tech/neondb?sslmode=require"
+
+db = create_engine(URL_BANCO)
 
 Base = declarative_base()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+class TipoUsuario(enum.Enum):
+    Cidadao = "Cidadao"
+    Agente = "Agente"
+    Gestor = "Gestor"
 
 
 class Usuario(Base):
     __tablename__ = "usuario"
     
     id = Column("id", Integer, primary_key=True, autoincrement=True)
-    nome = Column("nome", String)
-    email = Column("email", String, nullable=False)
+    nome = Column("nome", String, nullable=False)
+    email = Column("email", String, nullable=False, unique=True)
     senha_hash = Column("senha_hash", String, nullable=False)
-    ativo = Column("ativo", Boolean)
-    admin = Column("admin", Boolean, default=False)
+    tipo_usuario = Column(Enum(TipoUsuario), nullable=False, default=TipoUsuario.Cidadao)
+    ativo = Column("ativo", Boolean, nullable=False, default=True)
+    tentativas_login = Column("tentativas_login", Integer, nullable=False, default=0)
+    bloqueado_ate = Column("bloqueado_ate", DateTime, default=None)
+    criado_em = Column("criado_em", DateTime, nullable=False, default=datetime.now)
+    atualizado_em = Column("atualizado_em", DateTime, nullable=False, default=datetime.now, onupdate=datetime.now)
     
     tipo = Column(String)
     
@@ -26,12 +38,14 @@ class Usuario(Base):
         "polymorphic_on": tipo
     }
     
-    def __init__(self, nome, email, senha, ativo=True, admin=False):
+    def __init__(self, nome, email, senha, tipo_usuario=TipoUsuario.Cidadao, ativo=True, tentativas_login=0, bloqueado_ate=None):
         self.nome = nome
         self.email = email
         self.senha_hash = pwd_context.hash(senha)
+        self.tipo_usuario = tipo_usuario
         self.ativo = ativo
-        self.admin = admin
+        self.tentativas_login = tentativas_login
+        self.bloqueado_ate = bloqueado_ate
         
         
     def verificar_senha(self, senha_pura):
@@ -40,7 +54,7 @@ class Usuario(Base):
         você não consegue mais ler o valor original. Para logar o usuário depois,
         você precisará usar o pwd_context.verify
         """
-        return pwd_context.verify(senha_pura, self.senha)
+        return pwd_context.verify(senha_pura, self.senha_hash)
         
         
         
@@ -49,7 +63,7 @@ class Usuario(Base):
 class Cidadao(Usuario):
     __tablename__ = "cidadao"
     
-    id = Column("id", Integer, ForeignKey("usuario.id"), primary_key=True)
+    id_usuario = Column("id_usuario", Integer, ForeignKey("usuario.id"), primary_key=True)
     cpf = Column('cpf', String(11), nullable=False, unique=True)
     telefone = Column('telefone', String(15))
     data_nascimento = Column('data_nascimento', Date, nullable=False)  
@@ -65,9 +79,9 @@ class Cidadao(Usuario):
 class Funcionario(Usuario):
     __tablename__ = "funcionario"
     
-    id = Column("id", Integer, ForeignKey("usuario.id"), primary_key=True)  
-    matricula = Column("matricula", String, nullable=False)
-    cargo = Column("cargo", String)
+    id_usuario = Column("id_usuario", Integer, ForeignKey("usuario.id"), primary_key=True)  
+    matricula = Column("matricula", String, nullable=False, unique=True)
+    cargo = Column("cargo", String, nullable=False)
     
     __mapper_args__ = {
         "polymorphic_identity": "funcionario",
@@ -81,19 +95,24 @@ class Endereco(Base):
     __tablename__ = "endereco"
     
     id = Column("id", Integer, primary_key=True, autoincrement=True)
-    bairro = Column("bairro", ForeignKey("bairro.id"), nullable=False)
-    rua = Column("rua", String, nullable=False)
-    numero = Column("numero", Integer)
-    complemento = Column("complemento", String, default=None)
+    endereco_completo = Column("endereco_completo", String(500), default=None)
+    rua = Column("rua", String(200))
+    numero = Column("numero", String(20))
+    complemento = Column("complemento", String(100), default=None)
+    id_bairro = Column("id_bairro", Integer, ForeignKey("bairro.id"), nullable=False)
     latitude = Column('latitude', Float, default=None)
     longitude = Column('longitude', Float, default=None)
     fonte_localizacao = Column('fonte_localizacao', String, default='manual')
     
-    def __init__(self, bairro, rua, numero, complemento = None):
-        self.bairro = bairro
+    def __init__(self, id_bairro, rua, numero, complemento=None, endereco_completo=None, latitude=None, longitude=None, fonte_localizacao='manual'):
+        self.id_bairro = id_bairro
         self.rua = rua
         self.numero = numero
         self.complemento = complemento
+        self.endereco_completo = endereco_completo
+        self.latitude = latitude
+        self.longitude = longitude
+        self.fonte_localizacao = fonte_localizacao
         
 
 
@@ -122,25 +141,30 @@ class Ocorrencia(Base):
     )
     
     id = Column("id", Integer, primary_key=True, autoincrement=True)
-    titulo = Column("titulo", String, nullable=False)
-    descricao = Column("descricao", String, nullable=False)
-    status = Column("status", ChoiceType(choices=STATUS_PEDIDOS))
-    urgencia = Column(Enum("Baixa", "Media", "Alta", "Critica", name="urgencia"), nullable=True)
+    titulo = Column("titulo", String(100), nullable=False)
+    descricao = Column("descricao", String(300), nullable=False)
+    status = Column("status", Enum("Em_Analise", "Pendente", "Em_Execucao", "Finalizado", "Arquivado", name="status_ocorrencia_enum"), nullable=False, default="Em_Analise")
+    urgencia = Column("urgencia", Enum("Baixa", "Media", "Alta", "Critica", name="urgencia_enum"), nullable=True)
+    justificativa = Column("justificativa", String(300), default=None)
     data_abertura = Column("data_abertura", DateTime, default=datetime.now, nullable=False)
     data_fechamento = Column("data_fechamento", DateTime)
-    id_cidadao = Column("cidadao", ForeignKey("cidadao.id"))
-    id_funcionario = Column("funcionario", ForeignKey("funcionario.id"))
-    id_endereco = Column("endereco", ForeignKey("endereco.id"))
+    id_cidadao = Column("id_cidadao", Integer, ForeignKey("cidadao.id_usuario"), nullable=False)
+    id_servico = Column("id_servico", Integer, ForeignKey("servico.id"), nullable=False)
+    id_endereco = Column("id_endereco", Integer, ForeignKey("endereco.id"), nullable=False)
+    id_agente_triagem = Column("id_agente_triagem", Integer, ForeignKey("funcionario.id_usuario"), default=None)
+    id_agente_execucao = Column("id_agente_execucao", Integer, ForeignKey("funcionario.id_usuario"), default=None)
+    id_agente_finalizado = Column("id_agente_finalizado", Integer, ForeignKey("funcionario.id_usuario"), default=None)
     
-    def __init__(self, titulo, descricao, urgencia, data_fechamento, id_cidadao, id_funcionario, id_endereco, status="Em_Analise"):
+    def __init__(self, titulo, descricao, id_cidadao, id_servico, id_endereco, urgencia=None, status="Em_Analise", data_fechamento=None, justificativa=None):
         self.titulo = titulo
         self.descricao = descricao
         self.status = status
         self.urgencia = urgencia
         self.data_fechamento = data_fechamento
         self.id_cidadao = id_cidadao
-        self.id_funcionario = id_funcionario
+        self.id_servico = id_servico
         self.id_endereco = id_endereco
+        self.justificativa = justificativa
         
     def fechar_ocorrencia(self):
         self.status = "Finalizado"
@@ -151,23 +175,33 @@ class Historico_Ocorrencia(Base):
     __tablename__ = "historico_ocorrencia"
     
     id = Column("id", Integer, primary_key=True, autoincrement=True)
-    data = Column("data", DateTime, default=datetime.now)
-    mensagem = Column("mensagem", String, nullable=False)
-    status = Column("status", String, nullable=False)
-    id_ocorrencia = Column("id_ocorrencia", ForeignKey("ocorrencia.id"), nullable=False)
+    id_ocorrencia = Column("id_ocorrencia", Integer, ForeignKey("ocorrencia.id"), nullable=False)
+    status_anterior = Column("status_anterior", Enum("Em_Analise", "Pendente", "Em_Execucao", "Finalizado", "Arquivado", name="status_ocorrencia_enum"), default=None)
+    status_novo = Column("status_novo", Enum("Em_Analise", "Pendente", "Em_Execucao", "Finalizado", "Arquivado", name="status_ocorrencia_enum"), nullable=False)
+    mensagem = Column("mensagem", String(300))
+    alterado_por = Column("alterado_por", Integer, ForeignKey("usuario.id"), default=None)
+    criado_em = Column("criado_em", DateTime, default=datetime.now, nullable=False)
     
-    def __init__(self, mensagem, status, id_ocorrencia):
-        self.mensagem = mensagem
-        self.status = status
+    def __init__(self, id_ocorrencia, status_novo, status_anterior=None, mensagem=None, alterado_por=None):
         self.id_ocorrencia = id_ocorrencia
+        self.status_anterior = status_anterior
+        self.status_novo = status_novo
+        self.mensagem = mensagem
+        self.alterado_por = alterado_por
 
 
-class Servico_Ocorrencia:
+class Servico(Base):
     __tablename__ = 'servico'
 
     id = Column("id", Integer, primary_key=True, autoincrement=True)
-    nome = Column("nome", String, nullable=False)
+    nome = Column("nome", String(100), nullable=False, unique=True)
     descricao = Column("descricao", String)
     prazo_estimado_dias = Column("prazo_estimado_dias", Integer)
-    ativo = Column("ativo", Boolean, default=True)
+    ativo = Column("ativo", Boolean, default=True, nullable=False)
+    
+    def __init__(self, nome, descricao=None, prazo_estimado_dias=None, ativo=True):
+        self.nome = nome
+        self.descricao = descricao
+        self.prazo_estimado_dias = prazo_estimado_dias
+        self.ativo = ativo
 
