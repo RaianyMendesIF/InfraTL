@@ -38,13 +38,14 @@ class Usuario(Base):
         "polymorphic_on": tipo
     }
     
-    def __init__(self, nome, email, senha, ativo=True):
+    def __init__(self, nome, email, senha, tipo_usuario=TipoUsuario.Cidadao, ativo=True, tentativas_login=0, bloqueado_ate=None):
         self.nome = nome
         self.email = email
         self.senha_hash = pwd_context.hash(senha)
+        self.tipo_usuario = tipo_usuario
         self.ativo = ativo
-        self.tipo_usuario = TipoUsuario.Cidadao
-        self.tentativas_login = 0
+        self.tentativas_login = tentativas_login
+        self.bloqueado_ate = bloqueado_ate
         
         
     def verificar_senha(self, senha_pura):
