@@ -53,6 +53,7 @@ CREATE TABLE usuario (
     -- Nunca armazene a senha em texto puro — a constraint rejeita qualquer outro formato.
     senha_hash    VARCHAR(255)        NOT NULL
                                       CHECK (senha_hash ~* '^\$2[ab]?\$[0-9]{2}\$.{53}$'),
+    id_endereco   INT   NOT NULL REFERENCES endereco(id) ON DELETE RESTRICT,
     tipo_usuario  tipo_usuario_enum   NOT NULL,
     ativo         BOOLEAN             NOT NULL DEFAULT TRUE,
     -- Proteção contra força bruta (o trigger fn_controle_tentativas_login gerencia estes campos)
@@ -64,6 +65,7 @@ CREATE TABLE usuario (
 );
 CREATE INDEX idx_usuario_email ON usuario (email);
 CREATE INDEX idx_usuario_ativo ON usuario (ativo) WHERE ativo = TRUE;
+CREATE INDEX idx_usuario_endereco ON usuario (id_endereco);
 
 -- Dados exclusivos dos funcionários públicos (RF02)
 CREATE TABLE funcionario (
