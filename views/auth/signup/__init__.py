@@ -1,1 +1,0 @@
-from .signup import router as router_signup
