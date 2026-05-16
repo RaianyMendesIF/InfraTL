@@ -31,11 +31,10 @@ class Usuario(Base):
     criado_em = Column("criado_em", DateTime, nullable=False, default=datetime.now)
     atualizado_em = Column("atualizado_em", DateTime, nullable=False, default=datetime.now, onupdate=datetime.now)
     
-    tipo = Column(String)
     
     __mapper_args__ = {
-        "polymorphic_identity": "usuario",
-        "polymorphic_on": tipo
+        "polymorphic_identity": TipoUsuario.Cidadao,
+        "polymorphic_on": tipo_usuario
     }
     
     def __init__(self, nome, email, senha, tipo_usuario=TipoUsuario.Cidadao, ativo=True, tentativas_login=0, bloqueado_ate=None):
