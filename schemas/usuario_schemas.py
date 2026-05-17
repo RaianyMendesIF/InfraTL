@@ -1,21 +1,29 @@
 from pydantic import BaseModel, EmailStr, ConfigDict
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, date
+from schemas.endereco_schemas import Endereco_schema_cadastro
+
 
 class Usuario_schema_cadastro(BaseModel):
     nome: str
     cpf: str
     telefone: str
-    data_nascimento: str
+    data_nascimento: date
     email: EmailStr
     senha: str
+    endereco: Endereco_schema_cadastro
     
-class Usuario_schema_resposta_cadastro(BaseModel):
+class Usuario_response(BaseModel):
     id: int
     nome: str
-    email: EmailStr
+    cpf: str
+    telefone: str
+    data_nascimento: date
+    email: str
+    id_endereco: int
+    # endereco: Endereco_schema_cadastro
+    tipo_usuario: str   
     ativo: bool
-    criado_em: datetime # Aqui a data gerada pelo banco aparece
 
-    # Essa configuração avisa o Pydantic para ler os dados do objeto do SQLAlchemy
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        from_attributes = True 

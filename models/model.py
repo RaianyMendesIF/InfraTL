@@ -4,6 +4,7 @@ from datetime import datetime
 from passlib.context import CryptContext
 import enum
 import bcrypt
+from geoalchemy2 import Geography
 
 Base = declarative_base()
 
@@ -33,6 +34,7 @@ class Usuario(Base):
     bloqueado_ate = Column("bloqueado_ate", DateTime, default=None)
     criado_em = Column("criado_em", DateTime, nullable=False, default=datetime.now)
     atualizado_em = Column("atualizado_em", DateTime, nullable=False, default=datetime.now, onupdate=datetime.now)
+    id_endereco = Column("id_endereco", Integer, ForeignKey("endereco.id"))
     
     
     __mapper_args__ = {
@@ -41,17 +43,19 @@ class Usuario(Base):
     }
     
     
-    def __init__(self, nome, cpf, telefone, data_nascimento, email, senha, tipo_usuario=TipoUsuario.Usuario, ativo=True, tentativas_login=0, bloqueado_ate=None):
+    def __init__(self, nome, cpf, telefone, data_nascimento, email, senha,  id_endereco, tipo_usuario=TipoUsuario.Usuario, ativo=True, tentativas_login=0, bloqueado_ate=None):
         self.nome = nome
         self.cpf = cpf
         self.telefone = telefone
         self.data_nascimento = data_nascimento
         self.email = email
         self.senha_hash = self.gerar_hash_senha(senha)
+        self.id_endereco = id_endereco
         self.tipo_usuario = tipo_usuario
         self.ativo = ativo
         self.tentativas_login = tentativas_login
         self.bloqueado_ate = bloqueado_ate
+       
     
     def gerar_hash_senha(self, senha_pura):
         senha_bytes = senha_pura.encode('utf-8')
@@ -87,16 +91,18 @@ class Endereco(Base):
     numero = Column("numero", String(20))
     complemento = Column("complemento", String(100), default=None)
     id_bairro = Column("id_bairro", Integer, ForeignKey("bairro.id"), nullable=False)
+    coordenadas = Column(Geography(geometry_type="POINT", srid=4326), nullable=True, default=None)
     latitude = Column('latitude', Float, default=None)
     longitude = Column('longitude', Float, default=None)
     fonte_localizacao = Column('fonte_localizacao', String, default='manual')
     
-    def __init__(self, id_bairro, rua, numero, complemento=None, endereco_completo=None, latitude=None, longitude=None, fonte_localizacao='manual'):
+    def __init__(self, id_bairro, rua, numero, complemento=None, endereco_completo=None, coordenadas=None, latitude=None, longitude=None, fonte_localizacao='manual'):
         self.id_bairro = id_bairro
         self.rua = rua
         self.numero = numero
         self.complemento = complemento
         self.endereco_completo = endereco_completo
+        self.coordenadas = coordenadas
         self.latitude = latitude
         self.longitude = longitude
         self.fonte_localizacao = fonte_localizacao

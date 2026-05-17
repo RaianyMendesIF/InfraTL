@@ -124,7 +124,7 @@ CREATE TABLE servico (
 --   - Possibilidade futura de busca por proximidade (ST_DWithin)
 --   - Cálculo de rotas para as equipes de campo
 
-CREATE TABLE endereco (
+CREATE TABLE endereco ( 
     id                SERIAL          PRIMARY KEY,
 
     -- Endereço formatado retornado pelo Nominatim (ex: "Rua das Flores, 123, Centro, Três Lagoas")
