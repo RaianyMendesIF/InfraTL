@@ -13,6 +13,9 @@ class Usuario_schema_cadastro(BaseModel):
     senha: str
     endereco: Endereco_schema_cadastro
     
+    class Config:
+        from_attributes = True 
+    
 class Usuario_response(BaseModel):
     id: int
     nome: str
@@ -27,3 +30,7 @@ class Usuario_response(BaseModel):
 
     class Config:
         from_attributes = True 
+        
+
+class Usuario_recuperar_senha(BaseModel):
+    email: EmailStr        

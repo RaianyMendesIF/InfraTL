@@ -1,10 +1,14 @@
 from fastapi import FastAPI, HTTPException
 from sqlalchemy import func
+from sqlalchemy.orm import Session
 from models.model import Usuario, Bairro, Endereco
-from schemas.usuario_schemas import Usuario_response
+from schemas.usuario_schemas import Usuario_response, Usuario_schema_cadastro, Usuario_recuperar_senha
+from passlib.context import CryptContext
 
+# Configura o passlib para usar o algoritmo bcrypt
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
  
-def cadastrar_usuario(dados, session):
+def cadastrar_usuario(dados: Usuario_schema_cadastro, session: Session):
     try:
         usuario = session.query(Usuario).filter(Usuario.email == dados.email).first()
         if usuario: 
@@ -44,7 +48,7 @@ def cadastrar_usuario(dados, session):
             telefone= dados.telefone,
             data_nascimento= dados.data_nascimento,
             email= dados.email,
-            senha= dados.senha,
+            senha= pwd_context.hash(dados.senha),
             id_endereco = endereco.id,
         )
         session.add(novo_usuario)
@@ -55,7 +59,7 @@ def cadastrar_usuario(dados, session):
 
         usuario_seguro = Usuario_response.model_validate(novo_usuario).model_dump()
 
-        return {"sucess": True, "mensagem": "Usuário cadastrado com sucesso!", "usuario": usuario_seguro}
+        return {"success": True, "mensagem": "Usuário cadastrado com sucesso!", "usuario": usuario_seguro}
             
     except HTTPException:
         raise
@@ -64,3 +68,6 @@ def cadastrar_usuario(dados, session):
         session.rollback()
         print(f"ERRO DE BANCO: {e}")
         raise HTTPException(status_code=500, detail=f"Erro interno no banco de dados: {str(e)}")
+    
+def recuperar_senha(dados: Usuario_recuperar_senha, session: Session):
+    pass
