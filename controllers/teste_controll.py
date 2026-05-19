@@ -2,6 +2,7 @@ from models.model import Usuario
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
+
 def testes(dados, session: Session):
     try:
         session.execute(text("SELECT 1"))
