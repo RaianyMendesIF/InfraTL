@@ -7,7 +7,7 @@ CREATE EXTENSION IF NOT EXISTS "citext";
 CREATE EXTENSION IF NOT EXISTS "postgis";
 
 -- Tipos de usuário no sistema
-CREATE TYPE tipo_usuario_enum   AS ENUM ('Cidadao', 'Agente', 'Gestor');
+CREATE TYPE tipo_usuario_enum   AS ENUM ('Usuario', 'Admin');
 
 -- Cargo específico dos funcionários
 CREATE TYPE cargo_enum          AS ENUM ('Agente', 'Gestor');
@@ -31,56 +31,6 @@ CREATE TYPE urgencia_enum AS ENUM ('Baixa', 'Media', 'Alta', 'Critica');
 
 -- Status da fila de e-mails (RF11)
 CREATE TYPE status_email_enum AS ENUM ('Pendente', 'Enviado', 'Erro');
-
-
--- TABELAS DE AUTENTICAÇÃO
-
--- Base de todos os usuários do sistema.
--- Centraliza login para que cidadão e funcionário usem o mesmo fluxo JWT.
-CREATE TABLE usuario (
-    id            SERIAL              PRIMARY KEY,
-    nome          VARCHAR(100)        NOT NULL
-                                      CHECK (LENGTH(TRIM(nome)) >= 3),
-    email         CITEXT              NOT NULL UNIQUE
-                                      CHECK (email ~* '^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$'),
-    -- Apenas hashes bcrypt são aceitos. O FastAPI usa passlib[bcrypt] para gerá-los.
-    -- Nunca armazene a senha em texto puro — a constraint rejeita qualquer outro formato.
-    senha_hash    VARCHAR(255)        NOT NULL
-                                      CHECK (senha_hash ~* '^\$2[ab]?\$[0-9]{2}\$.{53}$'),
-    tipo_usuario  tipo_usuario_enum   NOT NULL,
-    ativo         BOOLEAN             NOT NULL DEFAULT TRUE,
-    -- Proteção contra força bruta (o trigger fn_controle_tentativas_login gerencia estes campos)
-    tentativas_login  SMALLINT        NOT NULL DEFAULT 0 CHECK (tentativas_login >= 0),
-    bloqueado_ate     TIMESTAMPTZ     DEFAULT NULL,
-    -- Auditoria
-    criado_em     TIMESTAMPTZ         NOT NULL DEFAULT NOW(),
-    atualizado_em TIMESTAMPTZ         NOT NULL DEFAULT NOW()
-);
-CREATE INDEX idx_usuario_email ON usuario (email);
-CREATE INDEX idx_usuario_ativo ON usuario (ativo) WHERE ativo = TRUE;
-
--- Dados pessoais exclusivos do cidadão (RF01)
-CREATE TABLE cidadao (
-    id_usuario       INT         PRIMARY KEY
-                                 REFERENCES usuario (id) ON DELETE CASCADE ON UPDATE CASCADE,
-    cpf              CHAR(11)    NOT NULL UNIQUE
-                                 CHECK (cpf ~ '^[0-9]{11}$'),
-    telefone         VARCHAR(15)
-                                 CHECK (telefone IS NULL OR telefone ~ '^[0-9]{10,15}$'),
-    data_nascimento  DATE        NOT NULL
-                                 CHECK (data_nascimento <= CURRENT_DATE - INTERVAL '16 years')
-);
-CREATE INDEX idx_cidadao_cpf ON cidadao (cpf);
-
--- Dados exclusivos dos funcionários públicos (RF02)
-CREATE TABLE funcionario (
-    id_usuario  INT         PRIMARY KEY
-                            REFERENCES usuario (id) ON DELETE CASCADE ON UPDATE CASCADE,
-    matricula   VARCHAR(100) NOT NULL UNIQUE
-                             CHECK (LENGTH(TRIM(matricula)) >= 4),
-    cargo       cargo_enum  NOT NULL
-);
-CREATE INDEX idx_funcionario_matricula ON funcionario (matricula);
 
 -- TABELAS DE CATÁLOGO
 -- Dados de referência que raramente mudam.
@@ -107,29 +57,9 @@ CREATE TABLE servico (
     ativo                BOOLEAN      NOT NULL DEFAULT TRUE
 );
 
--- TABELAS DE NEGÓCIO
+-- TABELAS DE AUTENTICAÇÃO
 
--- Endereço detalhado de uma ocorrência com suporte a geolocalização (Opção C).
---
--- FLUXO NO FRONT-END (React):
---   1. Usuário digita o endereço ou clica "Usar minha localização" (GPS)
---   2. O React chama a API do Nominatim (gratuita, OpenStreetMap):
---      GET https://nominatim.openstreetmap.org/search?q=<endereco>&format=json&limit=1
---   3. O Nominatim retorna lat, lon e o endereço já formatado e padronizado
---   4. O React exibe um mapa de confirmação (ex: react-leaflet) e envia ao FastAPI:
---      { lat, lon, endereco_completo, rua, numero, complemento, id_bairro }
---   5. O FastAPI salva tudo nesta tabela
---
--- FALLBACK: se o Nominatim não encontrar o endereço (rua muito nova, área rural etc.),
---   o usuário pode digitar manualmente — lat e lon ficam NULL.
---   A ocorrência é registrada normalmente, sem coordenadas.
---
--- VANTAGENS das coordenadas armazenadas:
---   - Dashboard pode mostrar as ocorrências em um mapa real (ex: react-leaflet)
---   - Possibilidade futura de busca por proximidade (ST_DWithin)
---   - Cálculo de rotas para as equipes de campo
-
-CREATE TABLE endereco (
+CREATE TABLE endereco ( 
     id                SERIAL          PRIMARY KEY,
 
     -- Endereço formatado retornado pelo Nominatim (ex: "Rua das Flores, 123, Centro, Três Lagoas")
@@ -176,6 +106,73 @@ CREATE INDEX idx_endereco_bairro ON endereco (id_bairro);
 CREATE INDEX idx_endereco_coordenadas ON endereco USING GIST (coordenadas)
     WHERE coordenadas IS NOT NULL;
 
+
+-- Base de todos os usuários do sistema.
+-- Centraliza login para que cidadão e funcionário usem o mesmo fluxo JWT.
+CREATE TABLE usuario ( 
+    id            SERIAL              PRIMARY KEY,
+    nome          VARCHAR(100)        NOT NULL
+                                      CHECK (LENGTH(TRIM(nome)) >= 3),
+    cpf              CHAR(11)    NOT NULL UNIQUE
+                                 CHECK (cpf ~ '^[0-9]{11}$'),
+    telefone         VARCHAR(15)
+                                 CHECK (telefone IS NULL OR telefone ~ '^[0-9]{10,15}$'),
+    data_nascimento  DATE        NOT NULL
+                                 CHECK (data_nascimento <= CURRENT_DATE - INTERVAL '16 years'),
+    email         CITEXT              NOT NULL UNIQUE
+                                      CHECK (email ~* '^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$'),
+    -- Apenas hashes bcrypt são aceitos. O FastAPI usa passlib[bcrypt] para gerá-los.
+    -- Nunca armazene a senha em texto puro — a constraint rejeita qualquer outro formato.
+    senha_hash    VARCHAR(255)        NOT NULL
+                                      CHECK (senha_hash ~* '^\$2[ab]?\$[0-9]{2}\$.{53}$'),
+    id_endereco   INT   NOT NULL REFERENCES endereco(id) ON DELETE RESTRICT,
+    tipo_usuario  tipo_usuario_enum   NOT NULL,
+    ativo         BOOLEAN             NOT NULL DEFAULT TRUE,
+    -- Proteção contra força bruta (o trigger fn_controle_tentativas_login gerencia estes campos)
+    tentativas_login  SMALLINT        NOT NULL DEFAULT 0 CHECK (tentativas_login >= 0),
+    bloqueado_ate     TIMESTAMPTZ     DEFAULT NULL,
+    -- Auditoria
+    criado_em     TIMESTAMPTZ         NOT NULL DEFAULT NOW(),
+    atualizado_em TIMESTAMPTZ         NOT NULL DEFAULT NOW()
+);
+CREATE INDEX idx_usuario_email ON usuario (email);
+CREATE INDEX idx_usuario_ativo ON usuario (ativo) WHERE ativo = TRUE;
+CREATE INDEX idx_usuario_endereco ON usuario (id_endereco);
+
+-- Dados exclusivos dos funcionários públicos (RF02)
+CREATE TABLE funcionario (
+    id_usuario  INT         PRIMARY KEY
+                            REFERENCES usuario (id) ON DELETE CASCADE ON UPDATE CASCADE,
+    matricula   VARCHAR(100) NOT NULL UNIQUE
+                             CHECK (LENGTH(TRIM(matricula)) >= 4),
+    cargo       cargo_enum  NOT NULL
+);
+CREATE INDEX idx_funcionario_matricula ON funcionario (matricula);
+
+
+-- TABELAS DE NEGÓCIO
+
+-- Endereço detalhado de uma ocorrência com suporte a geolocalização (Opção C).
+--
+-- FLUXO NO FRONT-END (React):
+--   1. Usuário digita o endereço ou clica "Usar minha localização" (GPS)
+--   2. O React chama a API do Nominatim (gratuita, OpenStreetMap):
+--      GET https://nominatim.openstreetmap.org/search?q=<endereco>&format=json&limit=1
+--   3. O Nominatim retorna lat, lon e o endereço já formatado e padronizado
+--   4. O React exibe um mapa de confirmação (ex: react-leaflet) e envia ao FastAPI:
+--      { lat, lon, endereco_completo, rua, numero, complemento, id_bairro }
+--   5. O FastAPI salva tudo nesta tabela
+--
+-- FALLBACK: se o Nominatim não encontrar o endereço (rua muito nova, área rural etc.),
+--   o usuário pode digitar manualmente — lat e lon ficam NULL.
+--   A ocorrência é registrada normalmente, sem coordenadas.
+--
+-- VANTAGENS das coordenadas armazenadas:
+--   - Dashboard pode mostrar as ocorrências em um mapa real (ex: react-leaflet)
+--   - Possibilidade futura de busca por proximidade (ST_DWithin)
+--   - Cálculo de rotas para as equipes de campo
+
+
 -- Ocorrência registrada por um cidadão (RF03, RF04, RF05, RF06, RF07, RF08)
 -- Esta é a tabela central do sistema.
 CREATE TABLE ocorrencia (
@@ -193,18 +190,20 @@ CREATE TABLE ocorrencia (
     data_fechamento TIMESTAMPTZ             DEFAULT NULL,
 
     -- Relações
-    id_cidadao      INT                     NOT NULL
-                                            REFERENCES cidadao (id_usuario) ON DELETE RESTRICT,
+    id_usuario      INT                     NOT NULL
+                                            REFERENCES usuario (id) ON DELETE RESTRICT,
     id_servico      INT                     NOT NULL
                                             REFERENCES servico (id),
     id_endereco     INT                     NOT NULL
                                             REFERENCES endereco (id),
 
     -- Rastreamento de quem tocou na ocorrência (RF06, RF07)
+
+    id_agente_analise    INT                DEFAULT NULL REFERENCES funcionario (id_usuario),
     id_agente_triagem    INT                DEFAULT NULL REFERENCES funcionario (id_usuario),
     id_agente_execucao   INT                DEFAULT NULL REFERENCES funcionario (id_usuario),
     id_agente_finalizado INT                DEFAULT NULL REFERENCES funcionario (id_usuario),
-
+    
     -- Constraint: data de fechamento só pode existir após a abertura
     CONSTRAINT chk_datas CHECK (data_fechamento IS NULL OR data_fechamento >= data_abertura),
 
@@ -216,7 +215,7 @@ CREATE TABLE ocorrencia (
 
 -- Índices para os filtros do dashboard (RF05) e para garantir RNF01 (< 200ms)
 CREATE INDEX idx_ocorrencia_status   ON ocorrencia (status);
-CREATE INDEX idx_ocorrencia_cidadao  ON ocorrencia (id_cidadao);
+CREATE INDEX idx_ocorrencia_usuario  ON ocorrencia (id_usuario);
 CREATE INDEX idx_ocorrencia_servico  ON ocorrencia (id_servico);
 CREATE INDEX idx_ocorrencia_endereco ON ocorrencia (id_endereco);
 CREATE INDEX idx_ocorrencia_abertura ON ocorrencia (data_abertura DESC);
@@ -404,46 +403,13 @@ CREATE TRIGGER trg_usuario_atualizado_em
     BEFORE UPDATE ON usuario
     FOR EACH ROW EXECUTE FUNCTION fn_set_atualizado_em();
 
-
--- 8.2 Garante que o tipo_usuario seja coerente com a tabela filha
--- Impede que um cidadão seja inserido em "funcionario" e vice-versa
-CREATE OR REPLACE FUNCTION fn_validar_tipo_cidadao()
-RETURNS TRIGGER LANGUAGE plpgsql AS $$
-BEGIN
-    IF (SELECT tipo_usuario FROM usuario WHERE id = NEW.id_usuario) <> 'Cidadao' THEN
-        RAISE EXCEPTION 'INTEGRIDADE: usuario_id % não é do tipo Cidadao.', NEW.id_usuario;
-    END IF;
-    RETURN NEW;
-END;
-$$;
-
-CREATE TRIGGER trg_validar_tipo_cidadao
-    BEFORE INSERT OR UPDATE ON cidadao
-    FOR EACH ROW EXECUTE FUNCTION fn_validar_tipo_cidadao();
-
-
-CREATE OR REPLACE FUNCTION fn_validar_tipo_funcionario()
-RETURNS TRIGGER LANGUAGE plpgsql AS $$
-BEGIN
-    IF (SELECT tipo_usuario FROM usuario WHERE id = NEW.id_usuario) NOT IN ('Agente', 'Gestor') THEN
-        RAISE EXCEPTION 'INTEGRIDADE: usuario_id % não é Agente nem Gestor.', NEW.id_usuario;
-    END IF;
-    RETURN NEW;
-END;
-$$;
-
-CREATE TRIGGER trg_validar_tipo_funcionario
-    BEFORE INSERT OR UPDATE ON funcionario
-    FOR EACH ROW EXECUTE FUNCTION fn_validar_tipo_funcionario();
-
-
 -- 8.3 Controle de tentativas de login (proteção contra força bruta)
 -- Acionado automaticamente pelo trigger abaixo ao inserir em log_acesso.
 -- Após 5 falhas consecutivas, bloqueia a conta por 15 minutos.
 CREATE OR REPLACE FUNCTION fn_controle_tentativas_login()
 RETURNS TRIGGER LANGUAGE plpgsql AS $$
 BEGIN
-    IF NEW.sucesso = FALSE AND NEW.id_usuario IS NOT NULL THEN
+    IF NEW.sucesso = FALSE AND NEW.id IS NOT NULL THEN
         UPDATE usuario
         SET
             tentativas_login = tentativas_login + 1,
@@ -454,7 +420,7 @@ BEGIN
         WHERE id = NEW.id_usuario;
     END IF;
 
-    IF NEW.sucesso = TRUE AND NEW.id_usuario IS NOT NULL THEN
+    IF NEW.sucesso = TRUE AND NEW.id IS NOT NULL THEN
         UPDATE usuario
         SET tentativas_login = 0,
             bloqueado_ate = NULL
@@ -534,7 +500,7 @@ CREATE TRIGGER trg_registrar_historico
 CREATE OR REPLACE FUNCTION fn_enfileirar_email_notificacao()
 RETURNS TRIGGER LANGUAGE plpgsql AS $$
 DECLARE
-    v_email_cidadao  TEXT;
+    v_email_usuario  TEXT;
     v_titulo_occ     TEXT;
 BEGIN
     IF NEW.status = OLD.status THEN
@@ -542,14 +508,14 @@ BEGIN
     END IF;
 
     SELECT u.email, o.titulo
-    INTO v_email_cidadao, v_titulo_occ
+    INTO v_email_usuario, v_titulo_occ
     FROM ocorrencia o
-    JOIN usuario u ON u.id = o.id_cidadao
+    JOIN usuario u ON u.id = o.id_usuario
     WHERE o.id = NEW.id;
 
     INSERT INTO email_notificacao (id_usuario, id_ocorrencia, assunto, corpo)
     SELECT
-        NEW.id_cidadao,
+        NEW.id_usuario,
         NEW.id,
         'Infra TL: atualização na sua ocorrência #' || NEW.id,
         'Olá! O status da sua ocorrência "' || v_titulo_occ || '" foi atualizado para: ' || NEW.status || '.';
@@ -607,12 +573,29 @@ CREATE TRIGGER trg_sincronizar_coordenadas
     BEFORE INSERT OR UPDATE OF latitude, longitude ON endereco
     FOR EACH ROW EXECUTE FUNCTION fn_sincronizar_coordenadas();
 
+-- 8.9 Atualiza tipo_usuario automaticamente em INSERT na tabela FUNCIONARIO
+CREATE OR REPLACE FUNCTION fn_set_tipo_usuario()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+    -- Atualiza a tabela usuario baseada no id inserido na tabela funcionario
+    UPDATE usuario 
+    SET tipo_usuario = 'Admin'  
+    WHERE id = NEW.id_usuario;
+
+    RETURN NEW;
+END;
+$$;
+
+CREATE OR REPLACE TRIGGER trg_tipo_usuario_atualizado
+    AFTER INSERT ON funcionario
+    FOR EACH ROW 
+    EXECUTE FUNCTION fn_set_tipo_usuario();
 
 -- ROW LEVEL SECURITY (RLS) E ROLES
 
 -- Ativa RLS nas tabelas sensíveis
 ALTER TABLE usuario           ENABLE ROW LEVEL SECURITY;
-ALTER TABLE cidadao           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE funcionario           ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ocorrencia        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE refresh_token     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE email_notificacao ENABLE ROW LEVEL SECURITY;
@@ -622,15 +605,15 @@ ALTER TABLE email_notificacao ENABLE ROW LEVEL SECURITY;
 --   SET LOCAL app.tipo_usuario = '<tipo>';
 
 -- Cidadão vê apenas seus próprios dados
-CREATE POLICY pol_cidadao_proprio ON cidadao
+CREATE POLICY pol_usuario_proprio ON usuario
     FOR SELECT
-    USING (id_usuario = current_setting('app.usuario_id', TRUE)::INT);
-
+    USING (id = current_setting('app.usuario_id', TRUE)::INT);
+    
 -- Cidadão vê e cria apenas suas próprias ocorrências
-CREATE POLICY pol_ocorrencia_cidadao ON ocorrencia
+CREATE POLICY pol_ocorrencia_usuario ON ocorrencia
     FOR ALL
     USING (
-        id_cidadao = current_setting('app.usuario_id', TRUE)::INT
+        id_usuario = current_setting('app.usuario_id', TRUE)::INT
         OR current_setting('app.tipo_usuario', TRUE) IN ('Agente', 'Gestor')
     );
 
@@ -652,7 +635,7 @@ CREATE ROLE infratl_app LOGIN PASSWORD 'TROQUE_EM_PRODUCAO_app';
 GRANT CONNECT ON DATABASE postgres TO infratl_app;
 GRANT USAGE   ON SCHEMA public TO infratl_app;
 GRANT SELECT, INSERT, UPDATE ON TABLE
-    usuario, cidadao, funcionario,
+    usuario, usuario, funcionario,
     bairro, servico,
     endereco, ocorrencia, foto_ocorrencia,
     email_notificacao,
@@ -696,20 +679,15 @@ INSERT INTO servico (nome, descricao, prazo_estimado_dias) VALUES
     ('Sinalização',            'Placa danificada, faixa apagada ou sinal com defeito',      12),
     ('Esgoto',                 'Vazamento ou bueiro entupido',                               3);
 
--- ATENÇÃO: os hashes abaixo são PLACEHOLDERS.
--- Antes de usar, gere hashes reais com:
---   from passlib.context import CryptContext
---   pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
---   print(pwd.hash("sua_senha_aqui"))
+-- senha: 12345678
+INSERT INTO endereco (endereco_completo, rua, numero, complemento, id_bairro, latitude, longitude, fonte_localizacao) VALUES (
+    'Rua Maria Guilhermina Esteves, 947 - Santos Dumont, Três Lagoas - MS','Rua Maria Guilhermina Esteves', '947', 'Esquina com a mercearia', 2, NULL, NULL, 'manual');
 
-INSERT INTO usuario (nome, email, senha_hash, tipo_usuario) VALUES
-    ('Maria Silva',    'maria@email.com',                   '$2b$12$K8GpnvZkTzRk3V1mW2xYUeQJ4nL9pXmDsHtIcAoFbNrEwMjG7uOli', 'Cidadao'),
-    ('Carlos Agente',  'carlos.agente@prefeitura.gov.br',   '$2b$12$K8GpnvZkTzRk3V1mW2xYUeQJ4nL9pXmDsHtIcAoFbNrEwMjG7uOli', 'Agente'),
-    ('Ana Gestora',    'ana.gestora@prefeitura.gov.br',     '$2b$12$K8GpnvZkTzRk3V1mW2xYUeQJ4nL9pXmDsHtIcAoFbNrEwMjG7uOli', 'Gestor');
-
-INSERT INTO cidadao (id_usuario, cpf, telefone, data_nascimento) VALUES
-    ((SELECT id FROM usuario WHERE email = 'maria@email.com'), '12345678901', '67999990001', '1995-04-10');
+INSERT INTO usuario (nome, cpf, telefone, data_nascimento, email, senha_hash, tipo_usuario, id_endereco) VALUES 
+('Mariana Silva', '12345678901', '11999998888', '1985-04-12', 'mariana@email.com', '$2a$12$OXQJg/w.z3OP0.V94mKJAeelPGZdkhSFihNDJ0lNIEYGm.gqtp2fu', 'Usuario', 1),
+('Carlos Souza', '23456789012', '11988887777', '1990-08-23', 'carlos.agente@prefeitura.gov.br', '$2a$12$OXQJg/w.z3OP0.V94mKJAeelPGZdkhSFihNDJ0lNIEYGm.gqtp2fu', 'Admin', 1),
+('Ana Costa', '34567890123', '11977776666', '1995-12-05', 'ana.gestora@prefeitura.gov.br', '$2a$12$OXQJg/w.z3OP0.V94mKJAeelPGZdkhSFihNDJ0lNIEYGm.gqtp2fu', 'Admin', 1);
 
 INSERT INTO funcionario (id_usuario, matricula, cargo) VALUES
-    ((SELECT id FROM usuario WHERE email = 'carlos.agente@prefeitura.gov.br'), 'PMT-2024-001', 'Agente'),
-    ((SELECT id FROM usuario WHERE email = 'ana.gestora@prefeitura.gov.br'),   'PMT-2024-002', 'Gestor');
+    ((SELECT id FROM usuario WHERE email = 'carlos.agente@prefeitura.gov.br'), 'PMT-2024-002', 'Agente'),
+    ((SELECT id FROM usuario WHERE email = 'ana.gestora@prefeitura.gov.br'),   'PMT-2024-001', 'Gestor');

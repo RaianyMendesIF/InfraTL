@@ -1,7 +1,11 @@
 # main.py
 from fastapi import FastAPI
-from models.model import Base, db
+from models.model import Base
 from fastapi.middleware.cors import CORSMiddleware
+from database import engine
+
+from views.Usuario.usuario import router_usuario
+from views.Ocorrencia.ocorrencia import router_ocorrencia
 
 origins = [
     "http://localhost:8000",
@@ -19,19 +23,10 @@ app.add_middleware(
 )
 
 # Criar todas as tabelas no banco de dados
-Base.metadata.create_all(bind=db)
+# Base.metadata.create_all(bind=engine)
 
-from views.ocorrencia.admin import router_occurrence_admin
-from views.ocorrencia.public import router_occurrence_public
-from views.auth.login import router_login
-from views.auth.signup import router_signup
-  
-
-  
-app.include_router(router_occurrence_admin)  
-app.include_router(router_occurrence_public)  
-app.include_router(router_signup)  
-app.include_router(router_login)  
+app.include_router(router_usuario) 
+app.include_router(router_ocorrencia) 
   
 if __name__ == "__main__":  
     import uvicorn  
