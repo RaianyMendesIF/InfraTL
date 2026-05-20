@@ -148,13 +148,13 @@ class Ocorrencia(Base):
     id_agente_execucao = Column("id_agente_execucao", Integer, ForeignKey("funcionario.id_usuario"), default=None)
     id_agente_finalizado = Column("id_agente_finalizado", Integer, ForeignKey("funcionario.id_usuario"), default=None)
     
-    def __init__(self, titulo, descricao, id_Usuario, id_servico, id_endereco, urgencia=None, status="Em_Analise", data_fechamento=None, justificativa=None):
+    def __init__(self, titulo, descricao, id_usuario, id_servico, id_endereco, urgencia=None, status="Em_Analise", data_fechamento=None, justificativa=None):
         self.titulo = titulo
         self.descricao = descricao
         self.status = status
         self.urgencia = urgencia
         self.data_fechamento = data_fechamento
-        self.id_Usuario = id_Usuario
+        self.id_usuario = id_usuario
         self.id_servico = id_servico
         self.id_endereco = id_endereco
         self.justificativa = justificativa

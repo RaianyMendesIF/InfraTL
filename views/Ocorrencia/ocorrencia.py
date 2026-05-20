@@ -8,6 +8,6 @@ from controllers.ocorrencia_controll import OcorrenciaController
 
 router_ocorrencia = APIRouter(prefix="/ocorrencia", tags=["Ocorrencia"])
 
-@router_ocorrencia.post("/cadastrar", response_model=Ocorrencia_schema_resposta)
-async def cadastrar_ocorrencia(dados: Ocorrencia_schema_cadastro):
-    return await OcorrenciaController.cadastrar(dados)
+@router_ocorrencia.post("/cadastrar") # response_model=Ocorrencia_schema_resposta
+async def cadastrar_ocorrencia(dados: Ocorrencia_schema_cadastro, session: Session = Depends(pegar_sessao)):
+    return await OcorrenciaController.cadastrar_ocorrencia(dados= dados, session= session)
