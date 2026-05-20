@@ -12,10 +12,11 @@ class Usuario_schema_cadastro(BaseModel):
     email: EmailStr
     senha: str
     endereco: Endereco_schema_cadastro
-    
+
     class Config:
-        from_attributes = True 
-    
+        from_attributes = True
+
+
 class Usuario_response(BaseModel):
     id: int
     nome: str
@@ -25,12 +26,23 @@ class Usuario_response(BaseModel):
     email: str
     id_endereco: int
     # endereco: Endereco_schema_cadastro
-    tipo_usuario: str   
+    tipo_usuario: str
     ativo: bool
 
     class Config:
-        from_attributes = True 
-        
+        from_attributes = True
+
 
 class Usuario_recuperar_senha(BaseModel):
-    email: EmailStr        
+    email: EmailStr
+
+
+class Login_schema(BaseModel):
+    identificador: str  # Pode ser email, CPF ou matrícula
+    senha: str
+
+
+class Token_response(BaseModel):
+    access_token: str
+    token_type: str
+    usuario: Usuario_response
