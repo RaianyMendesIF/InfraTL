@@ -38,7 +38,7 @@ class Usuario_recuperar_senha(BaseModel):
 
 
 class Login_schema(BaseModel):
-    identificador: str  # Pode ser email, CPF ou matrícula
+    email: EmailStr
     senha: str
 
 

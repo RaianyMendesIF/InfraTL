@@ -8,6 +8,7 @@ from views.Usuario.usuario import router_usuario
 from views.Ocorrencia.ocorrencia import router_ocorrencia
 from views.Ocorrencia.triagem import router_triagem
 
+
 origins = [
     "http://localhost:8000",
     "http://127.0.0.1:8000"
