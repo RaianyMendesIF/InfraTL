@@ -1,6 +1,7 @@
 from sqlalchemy import Column, String, Integer, Boolean, Float, ForeignKey, DateTime, Date, Enum
 from sqlalchemy.orm import declarative_base
-from datetime import datetime
+from sqlalchemy.sql import func
+from datetime import datetime, timezone
 from passlib.context import CryptContext
 import enum
 import bcrypt
@@ -31,9 +32,9 @@ class Usuario(Base):
     tipo_usuario = Column(Enum(TipoUsuario), nullable=False, default=TipoUsuario.Usuario)
     ativo = Column("ativo", Boolean, nullable=False, default=True)
     tentativas_login = Column("tentativas_login", Integer, nullable=False, default=0)
-    bloqueado_ate = Column("bloqueado_ate", DateTime, default=None)
-    criado_em = Column("criado_em", DateTime, nullable=False, default=datetime.now)
-    atualizado_em = Column("atualizado_em", DateTime, nullable=False, default=datetime.now, onupdate=datetime.now)
+    bloqueado_ate = Column("bloqueado_ate", DateTime(timezone=True), default=None)
+    criado_em = Column("criado_em", DateTime(timezone=True), nullable=False, default=func.now())
+    atualizado_em = Column("atualizado_em", DateTime, nullable=False, default=func.now(), onupdate=func.now())
     id_endereco = Column("id_endereco", Integer, ForeignKey("endereco.id"))
     
     
