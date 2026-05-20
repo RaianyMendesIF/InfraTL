@@ -32,51 +32,6 @@ CREATE TYPE urgencia_enum AS ENUM ('Baixa', 'Media', 'Alta', 'Critica');
 -- Status da fila de e-mails (RF11)
 CREATE TYPE status_email_enum AS ENUM ('Pendente', 'Enviado', 'Erro');
 
-
--- TABELAS DE AUTENTICAÇÃO
-
--- Base de todos os usuários do sistema.
--- Centraliza login para que cidadão e funcionário usem o mesmo fluxo JWT.
-CREATE TABLE usuario ( 
-    id            SERIAL              PRIMARY KEY,
-    nome          VARCHAR(100)        NOT NULL
-                                      CHECK (LENGTH(TRIM(nome)) >= 3),
-    cpf              CHAR(11)    NOT NULL UNIQUE
-                                 CHECK (cpf ~ '^[0-9]{11}$'),
-    telefone         VARCHAR(15)
-                                 CHECK (telefone IS NULL OR telefone ~ '^[0-9]{10,15}$'),
-    data_nascimento  DATE        NOT NULL
-                                 CHECK (data_nascimento <= CURRENT_DATE - INTERVAL '16 years'),
-    email         CITEXT              NOT NULL UNIQUE
-                                      CHECK (email ~* '^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$'),
-    -- Apenas hashes bcrypt são aceitos. O FastAPI usa passlib[bcrypt] para gerá-los.
-    -- Nunca armazene a senha em texto puro — a constraint rejeita qualquer outro formato.
-    senha_hash    VARCHAR(255)        NOT NULL
-                                      CHECK (senha_hash ~* '^\$2[ab]?\$[0-9]{2}\$.{53}$'),
-    id_endereco   INT   NOT NULL REFERENCES endereco(id) ON DELETE RESTRICT,
-    tipo_usuario  tipo_usuario_enum   NOT NULL,
-    ativo         BOOLEAN             NOT NULL DEFAULT TRUE,
-    -- Proteção contra força bruta (o trigger fn_controle_tentativas_login gerencia estes campos)
-    tentativas_login  SMALLINT        NOT NULL DEFAULT 0 CHECK (tentativas_login >= 0),
-    bloqueado_ate     TIMESTAMPTZ     DEFAULT NULL,
-    -- Auditoria
-    criado_em     TIMESTAMPTZ         NOT NULL DEFAULT NOW(),
-    atualizado_em TIMESTAMPTZ         NOT NULL DEFAULT NOW()
-);
-CREATE INDEX idx_usuario_email ON usuario (email);
-CREATE INDEX idx_usuario_ativo ON usuario (ativo) WHERE ativo = TRUE;
-CREATE INDEX idx_usuario_endereco ON usuario (id_endereco);
-
--- Dados exclusivos dos funcionários públicos (RF02)
-CREATE TABLE funcionario (
-    id_usuario  INT         PRIMARY KEY
-                            REFERENCES usuario (id) ON DELETE CASCADE ON UPDATE CASCADE,
-    matricula   VARCHAR(100) NOT NULL UNIQUE
-                             CHECK (LENGTH(TRIM(matricula)) >= 4),
-    cargo       cargo_enum  NOT NULL
-);
-CREATE INDEX idx_funcionario_matricula ON funcionario (matricula);
-
 -- TABELAS DE CATÁLOGO
 -- Dados de referência que raramente mudam.
 -- Populadas pelo administrador do sistema.
@@ -102,27 +57,7 @@ CREATE TABLE servico (
     ativo                BOOLEAN      NOT NULL DEFAULT TRUE
 );
 
--- TABELAS DE NEGÓCIO
-
--- Endereço detalhado de uma ocorrência com suporte a geolocalização (Opção C).
---
--- FLUXO NO FRONT-END (React):
---   1. Usuário digita o endereço ou clica "Usar minha localização" (GPS)
---   2. O React chama a API do Nominatim (gratuita, OpenStreetMap):
---      GET https://nominatim.openstreetmap.org/search?q=<endereco>&format=json&limit=1
---   3. O Nominatim retorna lat, lon e o endereço já formatado e padronizado
---   4. O React exibe um mapa de confirmação (ex: react-leaflet) e envia ao FastAPI:
---      { lat, lon, endereco_completo, rua, numero, complemento, id_bairro }
---   5. O FastAPI salva tudo nesta tabela
---
--- FALLBACK: se o Nominatim não encontrar o endereço (rua muito nova, área rural etc.),
---   o usuário pode digitar manualmente — lat e lon ficam NULL.
---   A ocorrência é registrada normalmente, sem coordenadas.
---
--- VANTAGENS das coordenadas armazenadas:
---   - Dashboard pode mostrar as ocorrências em um mapa real (ex: react-leaflet)
---   - Possibilidade futura de busca por proximidade (ST_DWithin)
---   - Cálculo de rotas para as equipes de campo
+-- TABELAS DE AUTENTICAÇÃO
 
 CREATE TABLE endereco ( 
     id                SERIAL          PRIMARY KEY,
@@ -170,6 +105,73 @@ CREATE INDEX idx_endereco_bairro ON endereco (id_bairro);
 -- Sem este índice, buscas geográficas fazem full scan na tabela
 CREATE INDEX idx_endereco_coordenadas ON endereco USING GIST (coordenadas)
     WHERE coordenadas IS NOT NULL;
+
+
+-- Base de todos os usuários do sistema.
+-- Centraliza login para que cidadão e funcionário usem o mesmo fluxo JWT.
+CREATE TABLE usuario ( 
+    id            SERIAL              PRIMARY KEY,
+    nome          VARCHAR(100)        NOT NULL
+                                      CHECK (LENGTH(TRIM(nome)) >= 3),
+    cpf              CHAR(11)    NOT NULL UNIQUE
+                                 CHECK (cpf ~ '^[0-9]{11}$'),
+    telefone         VARCHAR(15)
+                                 CHECK (telefone IS NULL OR telefone ~ '^[0-9]{10,15}$'),
+    data_nascimento  DATE        NOT NULL
+                                 CHECK (data_nascimento <= CURRENT_DATE - INTERVAL '16 years'),
+    email         CITEXT              NOT NULL UNIQUE
+                                      CHECK (email ~* '^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$'),
+    -- Apenas hashes bcrypt são aceitos. O FastAPI usa passlib[bcrypt] para gerá-los.
+    -- Nunca armazene a senha em texto puro — a constraint rejeita qualquer outro formato.
+    senha_hash    VARCHAR(255)        NOT NULL
+                                      CHECK (senha_hash ~* '^\$2[ab]?\$[0-9]{2}\$.{53}$'),
+    id_endereco   INT   NOT NULL REFERENCES endereco(id) ON DELETE RESTRICT,
+    tipo_usuario  tipo_usuario_enum   NOT NULL,
+    ativo         BOOLEAN             NOT NULL DEFAULT TRUE,
+    -- Proteção contra força bruta (o trigger fn_controle_tentativas_login gerencia estes campos)
+    tentativas_login  SMALLINT        NOT NULL DEFAULT 0 CHECK (tentativas_login >= 0),
+    bloqueado_ate     TIMESTAMPTZ     DEFAULT NULL,
+    -- Auditoria
+    criado_em     TIMESTAMPTZ         NOT NULL DEFAULT NOW(),
+    atualizado_em TIMESTAMPTZ         NOT NULL DEFAULT NOW()
+);
+CREATE INDEX idx_usuario_email ON usuario (email);
+CREATE INDEX idx_usuario_ativo ON usuario (ativo) WHERE ativo = TRUE;
+CREATE INDEX idx_usuario_endereco ON usuario (id_endereco);
+
+-- Dados exclusivos dos funcionários públicos (RF02)
+CREATE TABLE funcionario (
+    id_usuario  INT         PRIMARY KEY
+                            REFERENCES usuario (id) ON DELETE CASCADE ON UPDATE CASCADE,
+    matricula   VARCHAR(100) NOT NULL UNIQUE
+                             CHECK (LENGTH(TRIM(matricula)) >= 4),
+    cargo       cargo_enum  NOT NULL
+);
+CREATE INDEX idx_funcionario_matricula ON funcionario (matricula);
+
+
+-- TABELAS DE NEGÓCIO
+
+-- Endereço detalhado de uma ocorrência com suporte a geolocalização (Opção C).
+--
+-- FLUXO NO FRONT-END (React):
+--   1. Usuário digita o endereço ou clica "Usar minha localização" (GPS)
+--   2. O React chama a API do Nominatim (gratuita, OpenStreetMap):
+--      GET https://nominatim.openstreetmap.org/search?q=<endereco>&format=json&limit=1
+--   3. O Nominatim retorna lat, lon e o endereço já formatado e padronizado
+--   4. O React exibe um mapa de confirmação (ex: react-leaflet) e envia ao FastAPI:
+--      { lat, lon, endereco_completo, rua, numero, complemento, id_bairro }
+--   5. O FastAPI salva tudo nesta tabela
+--
+-- FALLBACK: se o Nominatim não encontrar o endereço (rua muito nova, área rural etc.),
+--   o usuário pode digitar manualmente — lat e lon ficam NULL.
+--   A ocorrência é registrada normalmente, sem coordenadas.
+--
+-- VANTAGENS das coordenadas armazenadas:
+--   - Dashboard pode mostrar as ocorrências em um mapa real (ex: react-leaflet)
+--   - Possibilidade futura de busca por proximidade (ST_DWithin)
+--   - Cálculo de rotas para as equipes de campo
+
 
 -- Ocorrência registrada por um cidadão (RF03, RF04, RF05, RF06, RF07, RF08)
 -- Esta é a tabela central do sistema.
@@ -678,11 +680,13 @@ INSERT INTO servico (nome, descricao, prazo_estimado_dias) VALUES
     ('Esgoto',                 'Vazamento ou bueiro entupido',                               3);
 
 -- senha: 12345678
+INSERT INTO endereco (endereco_completo, rua, numero, complemento, id_bairro, latitude, longitude, fonte_localizacao) VALUES (
+    'Rua Maria Guilhermina Esteves, 947 - Santos Dumont, Três Lagoas - MS','Rua Maria Guilhermina Esteves', '947', 'Esquina com a mercearia', 2, NULL, NULL, 'manual');
 
-INSERT INTO usuario (nome, cpf, telefone, data_nascimento, email, senha_hash, tipo_usuario) VALUES 
-('Mariana Silva', '12345678901', '11999998888', '1985-04-12', 'mariana@email.com', '$2a$12$OXQJg/w.z3OP0.V94mKJAeelPGZdkhSFihNDJ0lNIEYGm.gqtp2fu', 'Usuario'),
-('Carlos Souza', '23456789012', '11988887777', '1990-08-23', 'carlos.agente@prefeitura.gov.br', '$2a$12$OXQJg/w.z3OP0.V94mKJAeelPGZdkhSFihNDJ0lNIEYGm.gqtp2fu', 'Admin'),
-('Ana Costa', '34567890123', '11977776666', '1995-12-05', 'ana.gestora@prefeitura.gov.br', '$2a$12$OXQJg/w.z3OP0.V94mKJAeelPGZdkhSFihNDJ0lNIEYGm.gqtp2fu', 'Admin');
+INSERT INTO usuario (nome, cpf, telefone, data_nascimento, email, senha_hash, tipo_usuario, id_endereco) VALUES 
+('Mariana Silva', '12345678901', '11999998888', '1985-04-12', 'mariana@email.com', '$2a$12$OXQJg/w.z3OP0.V94mKJAeelPGZdkhSFihNDJ0lNIEYGm.gqtp2fu', 'Usuario', 1),
+('Carlos Souza', '23456789012', '11988887777', '1990-08-23', 'carlos.agente@prefeitura.gov.br', '$2a$12$OXQJg/w.z3OP0.V94mKJAeelPGZdkhSFihNDJ0lNIEYGm.gqtp2fu', 'Admin', 1),
+('Ana Costa', '34567890123', '11977776666', '1995-12-05', 'ana.gestora@prefeitura.gov.br', '$2a$12$OXQJg/w.z3OP0.V94mKJAeelPGZdkhSFihNDJ0lNIEYGm.gqtp2fu', 'Admin', 1);
 
 INSERT INTO funcionario (id_usuario, matricula, cargo) VALUES
     ((SELECT id FROM usuario WHERE email = 'carlos.agente@prefeitura.gov.br'), 'PMT-2024-002', 'Agente'),

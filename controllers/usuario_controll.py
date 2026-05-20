@@ -5,7 +5,7 @@ from models.model import Usuario, Bairro, Endereco
 from schemas.usuario_schemas import Usuario_response
 
 class UsuarioController:
-    @classmethod
+    @staticmethod
     async def cadastrar_usuario(dados, session):
         try:
             usuario = session.query(Usuario).filter(Usuario.email == dados.email).first()
