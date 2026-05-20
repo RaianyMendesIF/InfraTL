@@ -66,3 +66,21 @@ class UsuarioController:
             session.rollback()
             print(f"ERRO DE BANCO: {e}")
             raise HTTPException(status_code=500, detail=f"Erro interno no banco de dados: {str(e)}")
+
+    async def recuperar_senha(dados, session):
+        try:
+            usuario = session.query(Usuario).filter(Usuario.email == dados.email).first()
+            if usuario: 
+                # Enviar e email de verificação
+                return {"sucess": True, "mensagem": "Usuário encotrado, email de recuperação enviado"}
+            else:
+                return {"sucess": False, "mensagem": "Usuário não encotrado!"}
+
+
+        except HTTPException:
+            raise
+            
+        except Exception as e:
+            session.rollback()
+            print(f"ERRO DE BANCO: {e}")
+            raise HTTPException(status_code=500, detail=f"Erro interno no banco de dados: {str(e)}")

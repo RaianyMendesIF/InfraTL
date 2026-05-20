@@ -15,4 +15,4 @@ async def criar_conta(dados: Usuario_schema_cadastro, session: Session = Depends
 
 @router_usuario.post("/recuperar-senha")
 async def recuperar_senha(dados: Usuario_recuperar_senha, session: Session = Depends(pegar_sessao)):
-    pass
+    return await UsuarioController.recuperar_senha(dados= dados, session= session)
