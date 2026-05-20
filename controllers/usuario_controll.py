@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from sqlalchemy import func
+from sqlalchemy.orm import Session
 from models.model import Usuario, Bairro, Endereco
 from schemas.usuario_schemas import Usuario_response
 
