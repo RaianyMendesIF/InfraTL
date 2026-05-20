@@ -10,8 +10,8 @@ from schemas.usuario_schemas import (
     Login_schema,
     Token_response,
 )
-from controllers.usuario_controll import UsuarioController
-from security import get_current_user, get_current_admin
+from controllers.usuario_controll import cadastrar_usuario, recuperar_senha, login_usuario
+from utils.security import get_current_user, get_current_admin
 
 router_usuario = APIRouter(prefix="/auth", tags=["Autentificacao"])
 
@@ -20,21 +20,21 @@ router_usuario = APIRouter(prefix="/auth", tags=["Autentificacao"])
 async def criar_conta(
     dados: Usuario_schema_cadastro, session: Session = Depends(pegar_sessao)
 ):
-    return await UsuarioController.cadastrar_usuario(dados=dados, session=session)
+    return cadastrar_usuario(dados=dados, session=session)
 
 
 @router_usuario.post("/recuperar-senha")
-async def recuperar_senha(
+async def recuperar_senha_rota(
     dados: Usuario_recuperar_senha, session: Session = Depends(pegar_sessao)
 ):
-    return await UsuarioController.recuperar_senha(dados=dados, session=session)
+    return recuperar_senha(dados=dados, session=session)
 
 
 @router_usuario.post("/login", response_model=Token_response)
 async def login(
     request: Request, dados: Login_schema, session: Session = Depends(pegar_sessao)
 ):
-    return await UsuarioController.login_usuario(
+    return login_usuario(
         dados=dados, session=session, request=request
     )
 
