@@ -6,6 +6,7 @@ from database import engine
 
 from views.Usuario.usuario import router_usuario
 from views.Ocorrencia.ocorrencia import router_ocorrencia
+from views.Funcionario.funcionario import router_funcionario
 
 origins = [
     "http://localhost:8000",
@@ -27,6 +28,7 @@ app.add_middleware(
 
 app.include_router(router_usuario) 
 app.include_router(router_ocorrencia) 
+app.include_router(router_funcionario) 
   
 if __name__ == "__main__":  
     import uvicorn  
