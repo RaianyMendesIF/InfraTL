@@ -59,7 +59,11 @@ class OcorrenciaController:
             dados_ocorrencia = Ocorrencia_schema_resposta.model_validate(ocorrencia).model_dump()
 
             return {"sucess": True, "mensagem": "Ocorrencia cadastrado com sucesso!", "ocorrencia": dados_ocorrencia}
-
+        
+        @staticmethod
+        def buscar_ocorrencias_por_usuario(session: Session, id_usuario: int):
+        return session.query(Ocorrencia).filter(Ocorrencia.id_usuario == id_usuario).all()
+        
         except HTTPException:
             raise
             
