@@ -23,6 +23,22 @@ def criar_token_jwt(data: dict):
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
+def token_recuperar_senha(email: str):
+    expire = datetime.utcnow() + timedelta(minutes=15)
+    dados = {"sub": email, "tipo": "reset", "exp": expire}
+    
+    return jwt.encode(dados, SECRET_KEY, algorithm=ALGORITHM)
+
+def decodificar_token_recuperacao(token: str):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+        if payload.get("tipo") != "reset":
+            return None
+        return payload.get("sub") # Retorna o e-mail que estava dentro do token
+    except jwt.ExpiredSignatureError:
+        return None # Token passou dos 15 minutos
+    except jwt.InvalidTokenError:
+        return None # Token falso/alterado
 
 def get_current_user(
     token: str = Depends(oauth2_scheme), session: Session = Depends(pegar_sessao)

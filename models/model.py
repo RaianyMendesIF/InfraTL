@@ -66,6 +66,9 @@ class Usuario(Base):
 
     def verificar_senha(self, senha_pura):
         return bcrypt.checkpw(senha_pura.encode('utf-8'), self.senha_hash.encode('utf-8'))
+    
+    def atualizar_senha(self, nova_senha_pura: str):
+        self.senha_hash = self.gerar_hash_senha(nova_senha_pura)
             
     
 class Funcionario(Usuario):

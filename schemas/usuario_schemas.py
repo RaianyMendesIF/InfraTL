@@ -36,6 +36,9 @@ class Usuario_response(BaseModel):
 class Usuario_recuperar_senha(BaseModel):
     email: EmailStr
 
+class Usuario_redefinir_senha(BaseModel):
+    token: str
+    nova_senha: str
 
 class Login_schema(BaseModel):
     email: EmailStr

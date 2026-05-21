@@ -9,8 +9,9 @@ from schemas.usuario_schemas import (
     Usuario_recuperar_senha,
     Login_schema,
     Token_response,
+    Usuario_redefinir_senha,
 )
-from controllers.usuario_controll import cadastrar_usuario, recuperar_senha, login_usuario
+from controllers.usuario_controll import cadastrar_usuario, recuperar_senha, login_usuario, redefinir_senha_usuario
 from utils.security import get_current_user, get_current_admin
 
 router_usuario = APIRouter(prefix="/auth", tags=["Autentificacao"])
@@ -37,6 +38,14 @@ async def login(
     return login_usuario(
         dados=dados, session=session, request=request
     )
+
+@router_usuario.post("/recuperar-senha")
+async def recuperar_senha(dados: Usuario_recuperar_senha, session: Session = Depends(pegar_sessao)):
+    return recuperar_senha(dados=dados, session=session)
+
+@router_usuario.post("/redefinir-senha")
+async def redefinir_senha(dados: Usuario_redefinir_senha, session: Session = Depends(pegar_sessao)):
+    return redefinir_senha_usuario(dados=dados, session=session)
 
 
 # --- EXEMPLO DE ROTAS PROTEGIDAS

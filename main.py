@@ -5,8 +5,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from database import engine
 
 from views.Usuario.usuario import router_usuario
-from views.Ocorrencia.ocorrencia import router_ocorrencia
-from views.Ocorrencia.triagem import router_triagem
+from views.ocorrencia.ocorrencia import router_ocorrencia
+from views.ocorrencia.triagem import router_triagem
 
 
 origins = [

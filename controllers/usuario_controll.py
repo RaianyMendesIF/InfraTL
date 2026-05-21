@@ -6,8 +6,8 @@ import re
 import hashlib
 
 from models.model import Usuario, Bairro, Endereco, Funcionario
-from schemas.usuario_schemas import Usuario_response
-from utils.security import criar_token_jwt
+from schemas.usuario_schemas import Usuario_response, Usuario_recuperar_senha, Usuario_redefinir_senha, Usuario_schema_cadastro
+from utils.security import criar_token_jwt, token_recuperar_senha, decodificar_token_recuperacao
 
 
 def gerar_hash_ip(ip: str) -> str:
@@ -15,7 +15,7 @@ def gerar_hash_ip(ip: str) -> str:
     return hashlib.sha256(ip.encode()).hexdigest()
 
 
-def cadastrar_usuario(dados, session):
+def cadastrar_usuario(dados: Usuario_schema_cadastro, session: Session):
     try:
         usuario = (
             session.query(Usuario).filter(Usuario.email == dados.email).first()
@@ -101,19 +101,17 @@ def cadastrar_usuario(dados, session):
         )
 
 
-def recuperar_senha(dados, session):
+def recuperar_senha(dados: Usuario_recuperar_senha, session: Session):
     try:
         usuario = (
             session.query(Usuario).filter(Usuario.email == dados.email).first()
         )
         if usuario:
-            # Enviar e email de verificação
-            return {
-                "sucess": True,
-                "mensagem": "Usuário encotrado, email de recuperação enviado",
-            }
-        else:
-            return {"sucess": False, "mensagem": "Usuário não encotrado!"}
+            # Gera o token de 15 minutos
+            token = token_recuperar_senha(usuario.email)
+            
+            # O link que o seu Front-end vai abrir (exemplo)
+            link_recuperacao = f"http://localhost:3000/nova-senha?token={token}"
 
     except HTTPException:
         raise
@@ -124,6 +122,27 @@ def recuperar_senha(dados, session):
         raise HTTPException(
             status_code=500, detail=f"Erro interno no banco de dados: {str(e)}"
         )
+
+def redefinir_senha_usuario(dados: Usuario_redefinir_senha, session: Session):
+    # 1. Abre o envelope (token) e vê se é válido e se não passou de 15 min
+    email = decodificar_token_recuperacao(dados.token)
+    
+    if not email:
+        raise HTTPException(status_code=400, detail="Link de recuperação inválido ou expirado. Solicite um novo.")
+        
+    # 2. Busca o usuário dono daquele e-mail
+    usuario = session.query(Usuario).filter(Usuario.email == email).first()
+    
+    if not usuario:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado.")
+        
+    # 3. Usa o método que criamos no Model para atualizar a senha com segurança
+    usuario.atualizar_senha(dados.nova_senha)
+    
+    # 4. Salva no banco!
+    session.commit()
+    
+    return {"mensagem": "Senha atualizada com sucesso! Você já pode fazer login."}
 
 
 def login_usuario(dados, session: Session, request: Request):
