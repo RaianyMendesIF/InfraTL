@@ -5,7 +5,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from database import engine
 
 from views.Usuario.usuario import router_usuario
-from views.ocorrencia.ocorrencia import router_ocorrencia
+from views.Ocorrencia.ocorrencia import router_ocorrencia
+from views.Ocorrencia.triagem import router_triagem
+
 
 origins = [
     "http://localhost:8000",
@@ -27,6 +29,7 @@ app.add_middleware(
 
 app.include_router(router_usuario) 
 app.include_router(router_ocorrencia) 
+app.include_router(router_triagem) 
   
 if __name__ == "__main__":  
     import uvicorn  
