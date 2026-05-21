@@ -6,8 +6,9 @@ import re
 import hashlib
 
 from models.model import Usuario, Bairro, Endereco, Funcionario
-from schemas.usuario_schemas import Usuario_response, Usuario_recuperar_senha, Usuario_redefinir_senha, Usuario_schema_cadastro
-from utils.security import criar_token_jwt, token_recuperar_senha, decodificar_token_recuperacao
+from schemas.usuario_schemas import Usuario_response, Login_schema, Usuario_recuperar_senha, Usuario_redefinir_senha, Usuario_schema_cadastro
+from utils.security import criar_token_jwt, token_recuperar_senha, decodificar_token_recuperacao, enviar_email_recuperacao, URL_FRONTEND_RECUPERACAO
+
 
 
 def gerar_hash_ip(ip: str) -> str:
@@ -101,7 +102,7 @@ def cadastrar_usuario(dados: Usuario_schema_cadastro, session: Session):
         )
 
 
-def recuperar_senha(dados: Usuario_recuperar_senha, session: Session):
+def solicitar_recuperar_senha(dados: Usuario_recuperar_senha, session: Session):
     try:
         usuario = (
             session.query(Usuario).filter(Usuario.email == dados.email).first()
@@ -111,8 +112,12 @@ def recuperar_senha(dados: Usuario_recuperar_senha, session: Session):
             token = token_recuperar_senha(usuario.email)
             
             # O link que o seu Front-end vai abrir (exemplo)
-            link_recuperacao = f"http://localhost:3000/nova-senha?token={token}"
+            url_base = URL_FRONTEND_RECUPERACAO
+            link = f"{url_base}?token={token}"
+            
+            enviar_email_recuperacao(email_destino=usuario.email, link_recuperacao=link)
 
+        return {"mensagem": "Se o e-mail estiver cadastrado, enviaremos um link de recuperação em instantes."}
     except HTTPException:
         raise
 
@@ -130,31 +135,24 @@ def redefinir_senha_usuario(dados: Usuario_redefinir_senha, session: Session):
     if not email:
         raise HTTPException(status_code=400, detail="Link de recuperação inválido ou expirado. Solicite um novo.")
         
-    # 2. Busca o usuário dono daquele e-mail
     usuario = session.query(Usuario).filter(Usuario.email == email).first()
     
     if not usuario:
         raise HTTPException(status_code=404, detail="Usuário não encontrado.")
         
-    # 3. Usa o método que criamos no Model para atualizar a senha com segurança
     usuario.atualizar_senha(dados.nova_senha)
     
-    # 4. Salva no banco!
     session.commit()
     
     return {"mensagem": "Senha atualizada com sucesso! Você já pode fazer login."}
 
 
-def login_usuario(dados, session: Session, request: Request):
+def login_usuario(dados: Login_schema, session: Session, request: Request):
     try:
-        email = dados.email
-        senha = dados.senha
-        usuario = None
-
         ip_cliente = request.client.host if request and request.client else "0.0.0.0"
         ip_hash = gerar_hash_ip(ip_cliente)
 
-        usuario = session.query(Usuario).filter(Usuario.email == email).first()
+        usuario = session.query(Usuario).filter(Usuario.email == dados.email).first()
         
         if not usuario:
             raise HTTPException(status_code=401, detail="E-mail ou senha incorretos")
@@ -167,7 +165,7 @@ def login_usuario(dados, session: Session, request: Request):
                 detail="Conta temporariamente bloqueada por múltiplas tentativas falhas."
             )
 
-        senha_valida = usuario.verificar_senha(senha)
+        senha_valida = usuario.verificar_senha(dados.senha)
         
         if not senha_valida:
             # Registra a falha no banco para disparar a trigger
