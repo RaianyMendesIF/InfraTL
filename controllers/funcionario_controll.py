@@ -12,6 +12,11 @@ class FuncionarioController:
         if not usuario_solicitante:
             raise HTTPException(status_code=400, detail="Usuário não tem permissão de realizar essa requisição!")
 
+        funcionario = session.query(Funcionario).filter(Funcionario.id_usuario == dados.id_usuario).first()
+
+        if funcionario:
+            return {"sucess": False, "mensagem": "Usuário já possui permissões admin!"}
+
         usuario = session.query(Usuario).filter(Usuario.id == dados.id_usuario).first()
 
         if usuario:
@@ -35,7 +40,7 @@ class FuncionarioController:
         if not usuario_solicitante:
             raise HTTPException(status_code=400, detail="Usuário não tem permissão de realizar essa requisição!")
 
-        usuario = session.query(Usuario).filter(Usuario.id == dados.id_usuario).first()
+        usuario = session.query(Funcionario).filter(Funcionario.id_usuario == dados.id_usuario).first()
 
         if usuario:
             stmt = delete(Funcionario).where(Funcionario.id_usuario == usuario.id)
