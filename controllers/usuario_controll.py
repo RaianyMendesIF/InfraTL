@@ -1,86 +1,198 @@
-from fastapi import FastAPI, HTTPException
-from sqlalchemy import func
+from datetime import datetime, timezone
+from fastapi import Request, HTTPException
+from sqlalchemy import func, text
 from sqlalchemy.orm import Session
-from models.model import Usuario, Bairro, Endereco
+import re
+import hashlib
+
+from models.model import Usuario, Bairro, Endereco, Funcionario
 from schemas.usuario_schemas import Usuario_response
+from utils.security import criar_token_jwt
 
-class UsuarioController:
-    @staticmethod
-    async def cadastrar_usuario(dados, session):
-        try:
-            usuario = session.query(Usuario).filter(Usuario.email == dados.email).first()
-            if usuario: 
-                raise HTTPException(status_code=400, detail="Ja existe um usuario com esse email")
 
-            bairro = session.query(Bairro).filter(Bairro.nome == dados.endereco.bairro).first()
-            if not bairro:
-                raise HTTPException(status_code=400, detail="Bairro não encontrado!")
+def gerar_hash_ip(ip: str) -> str:
+    """Gera hash SHA-256 do IP (LGPD compliance)"""
+    return hashlib.sha256(ip.encode()).hexdigest()
 
-            endereco_duplicado = session.query(Endereco).filter(
+
+def cadastrar_usuario(dados, session):
+    try:
+        usuario = (
+            session.query(Usuario).filter(Usuario.email == dados.email).first()
+        )
+        if usuario:
+            raise HTTPException(
+                status_code=400, detail="Ja existe um usuario com esse email"
+            )
+
+        bairro = (
+            session.query(Bairro)
+            .filter(Bairro.nome == dados.endereco.bairro)
+            .first()
+        )
+        if not bairro:
+            raise HTTPException(status_code=400, detail="Bairro não encontrado!")
+
+        endereco_duplicado = (
+            session.query(Endereco)
+            .filter(
                 Endereco.rua.ilike(dados.endereco.rua),
                 Endereco.numero == dados.endereco.numero,
-                Endereco.complemento.ilike(dados.endereco.complemento) if dados.endereco.complemento else Endereco.complemento == None,
-                Endereco.id_bairro == bairro.id
-            ).first()
-
-            if endereco_duplicado:
-                endereco = endereco_duplicado
-            else:
-                endereco = Endereco( 
-                    endereco_completo = dados.endereco.endereco_completo, 
-                    rua = dados.endereco.rua, 
-                    numero = dados.endereco.numero, 
-                    complemento = dados.endereco.complemento, 
-                    id_bairro = bairro.id, 
-                    coordenadas = func.ST_GeographyFromText(dados.endereco.coordenadas) if dados.endereco.coordenadas else None, 
-                    latitude = dados.endereco.latitude, 
-                    longitude = dados.endereco.longitude, 
-                    fonte_localizacao = dados.endereco.fonte_localizacao
-                )
-                session.add(endereco)
-                session.flush() 
-            
-            novo_usuario = Usuario(
-                nome= dados.nome,
-                cpf= dados.cpf,
-                telefone= dados.telefone,
-                data_nascimento= dados.data_nascimento,
-                email= dados.email,
-                senha= dados.senha,
-                id_endereco = endereco.id,
+                (
+                    Endereco.complemento.ilike(dados.endereco.complemento)
+                    if dados.endereco.complemento
+                    else Endereco.complemento == None
+                ),
+                Endereco.id_bairro == bairro.id,
             )
-            session.add(novo_usuario)
+            .first()
+        )
+
+        if endereco_duplicado:
+            endereco = endereco_duplicado
+        else:
+            endereco = Endereco(
+                endereco_completo=dados.endereco.endereco_completo,
+                rua=dados.endereco.rua,
+                numero=dados.endereco.numero,
+                complemento=dados.endereco.complemento,
+                id_bairro=bairro.id,
+                coordenadas=(
+                    func.ST_GeographyFromText(dados.endereco.coordenadas)
+                    if dados.endereco.coordenadas
+                    else None
+                ),
+                latitude=dados.endereco.latitude,
+                longitude=dados.endereco.longitude,
+                fonte_localizacao=dados.endereco.fonte_localizacao,
+            )
+            session.add(endereco)
+            session.flush()
+
+        novo_usuario = Usuario(
+            nome=dados.nome,
+            cpf=dados.cpf,
+            telefone=dados.telefone,
+            data_nascimento=dados.data_nascimento,
+            email=dados.email,
+            senha=dados.senha,
+            id_endereco=endereco.id,
+        )
+        session.add(novo_usuario)
+        session.commit()
+        session.refresh(novo_usuario)
+
+        usuario_seguro = Usuario_response.model_validate(novo_usuario).model_dump()
+
+        return {
+            "sucess": True,
+            "mensagem": "Usuário cadastrado com sucesso!",
+            "usuario": usuario_seguro,
+        }
+
+    except HTTPException:
+        raise
+
+    except Exception as e:
+        session.rollback()
+        print(f"ERRO DE BANCO: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Erro interno no banco de dados: {str(e)}"
+        )
+
+
+def recuperar_senha(dados, session):
+    try:
+        usuario = (
+            session.query(Usuario).filter(Usuario.email == dados.email).first()
+        )
+        if usuario:
+            # Enviar e email de verificação
+            return {
+                "sucess": True,
+                "mensagem": "Usuário encotrado, email de recuperação enviado",
+            }
+        else:
+            return {"sucess": False, "mensagem": "Usuário não encotrado!"}
+
+    except HTTPException:
+        raise
+
+    except Exception as e:
+        session.rollback()
+        print(f"ERRO DE BANCO: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Erro interno no banco de dados: {str(e)}"
+        )
+
+
+def login_usuario(dados, session: Session, request: Request):
+    try:
+        email = dados.email
+        senha = dados.senha
+        usuario = None
+
+        ip_cliente = request.client.host if request and request.client else "0.0.0.0"
+        ip_hash = gerar_hash_ip(ip_cliente)
+
+        usuario = session.query(Usuario).filter(Usuario.email == email).first()
+        
+        if not usuario:
+            raise HTTPException(status_code=401, detail="E-mail ou senha incorretos")
+
+        agora_utc = datetime.now(timezone.utc)
+        # Verifica se o usuário está bloqueado pela trigger do banco
+        if usuario.bloqueado_ate and usuario.bloqueado_ate > agora_utc:
+            raise HTTPException(
+                status_code=403,
+                detail="Conta temporariamente bloqueada por múltiplas tentativas falhas."
+            )
+
+        senha_valida = usuario.verificar_senha(senha)
+        
+        if not senha_valida:
+            # Registra a falha no banco para disparar a trigger
+            session.execute(
+                text("""
+                INSERT INTO log_acesso (id_usuario, ip_hash, sucesso, motivo_falha)
+                VALUES (:id_usr, :ip_hash, false, 'Senha incorreta')
+                """),
+                {"id_usr": usuario.id, "ip_hash": ip_hash},
+            )
             session.commit()
-            session.refresh(novo_usuario)
+            # Erro padrão genérico (igual ao do e-mail)
+            raise HTTPException(status_code=401, detail="E-mail ou senha incorretos")
 
-            # novo_usuario.endereco = endereco
+        # Registra sucesso no banco (zera tentativas de login)
+        session.execute(
+            text("""
+            INSERT INTO log_acesso (id_usuario, ip_hash, sucesso, motivo_falha)
+            VALUES (:id_usr, :ip_hash, true, NULL)
+            """),
+            {"id_usr": usuario.id, "ip_hash": ip_hash},
+        )
+        session.commit()
 
-            usuario_seguro = Usuario_response.model_validate(novo_usuario).model_dump()
+        # 2. Gera o Token (Identificando o tipo de usuário - RF10)
+        tipo = usuario.tipo_usuario.value if hasattr(usuario.tipo_usuario, 'value') else usuario.tipo_usuario
+        
+        token = criar_token_jwt(
+            data={"sub": str(usuario.id), "tipo": tipo}
+        )
 
-            return {"sucess": True, "mensagem": "Usuário cadastrado com sucesso!", "usuario": usuario_seguro}
-                
-        except HTTPException:
-            raise
-            
-        except Exception as e:
-            session.rollback()
-            print(f"ERRO DE BANCO: {e}")
-            raise HTTPException(status_code=500, detail=f"Erro interno no banco de dados: {str(e)}")
+        # Filtra a senha antes de devolver os dados
+        usuario_seguro = Usuario_response.model_validate(usuario).model_dump()
 
-    async def recuperar_senha(dados, session):
-        try:
-            usuario = session.query(Usuario).filter(Usuario.email == dados.email).first()
-            if usuario: 
-                # Enviar e email de verificação
-                return {"sucess": True, "mensagem": "Usuário encotrado, email de recuperação enviado"}
-            else:
-                return {"sucess": False, "mensagem": "Usuário não encotrado!"}
+        return {
+            "access_token": token,
+            "token_type": "bearer",
+            "usuario": usuario_seguro,
+        }
 
-
-        except HTTPException:
-            raise
-            
-        except Exception as e:
-            session.rollback()
-            print(f"ERRO DE BANCO: {e}")
-            raise HTTPException(status_code=500, detail=f"Erro interno no banco de dados: {str(e)}")
+    except HTTPException:
+        raise
+    
+    except Exception as e:
+        session.rollback()
+        print(f"ERRO NO LOGIN: {e}")
+        raise HTTPException(status_code=500, detail="Erro interno no servidor")
