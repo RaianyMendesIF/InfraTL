@@ -40,13 +40,16 @@ def token_recuperar_senha(email: str):
 def decodificar_token_recuperacao(token: str):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+        
         if payload.get("tipo") != "reset":
-            return None
+            raise ValueError("Este link não é válido para redefinir senhas.")
         return payload.get("sub") # Retorna o e-mail que estava dentro do token
+    
     except jwt.ExpiredSignatureError:
-        return None # Token passou dos 15 minutos
+        raise ValueError("O link de recuperação expirou (limite de 15 minutos). Por favor, solicite um novo lá na tela de login.")
+    
     except jwt.InvalidTokenError:
-        return None # Token falso/alterado
+        raise ValueError("O link de recuperação está corrompido ou é inválido.")
 
 def get_current_user(
     token: str = Depends(oauth2_scheme), session: Session = Depends(pegar_sessao)

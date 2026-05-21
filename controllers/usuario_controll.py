@@ -129,22 +129,32 @@ def solicitar_recuperar_senha(dados: Usuario_recuperar_senha, session: Session):
         )
 
 def redefinir_senha_usuario(dados: Usuario_redefinir_senha, session: Session):
-    # 1. Abre o envelope (token) e vê se é válido e se não passou de 15 min
-    email = decodificar_token_recuperacao(dados.token)
-    
-    if not email:
-        raise HTTPException(status_code=400, detail="Link de recuperação inválido ou expirado. Solicite um novo.")
+    try:
+        # 1. Abre o envelope (token) e vê se é válido e se não passou de 15 min
+        email = decodificar_token_recuperacao(dados.token)
         
-    usuario = session.query(Usuario).filter(Usuario.email == email).first()
-    
-    if not usuario:
-        raise HTTPException(status_code=404, detail="Usuário não encontrado.")
+        usuario = session.query(Usuario).filter(Usuario.email == email).first()
+            
+        if not usuario:
+            raise HTTPException(status_code=404, detail="Usuário não encontrado.")
+            
+        usuario.atualizar_senha(dados.nova_senha)
         
-    usuario.atualizar_senha(dados.nova_senha)
+        session.commit()
+        
+        return {"mensagem": "Senha atualizada com sucesso! Você já pode fazer login."}
     
-    session.commit()
-    
-    return {"mensagem": "Senha atualizada com sucesso! Você já pode fazer login."}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+        
+    except HTTPException:
+        raise
+        
+    except Exception as e:
+        session.rollback() 
+        print(f"ERRO AO REDEFINIR SENHA: {e}")
+        raise HTTPException(status_code=500, detail="Erro interno no servidor ao tentar salvar a senha.")
+
 
 
 def login_usuario(dados: Login_schema, session: Session, request: Request):

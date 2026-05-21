@@ -22,11 +22,6 @@ async def criar_conta(dados: Usuario_schema_cadastro, session: Session = Depends
     return cadastrar_usuario(dados=dados, session=session)
 
 
-@router_usuario.post("/recuperar-senha")
-async def recuperar_senha_rota(dados: Usuario_recuperar_senha, session: Session = Depends(pegar_sessao)):
-    return solicitar_recuperar_senha(dados=dados, session=session)
-
-
 @router_usuario.post("/login", response_model=Token_response)
 async def login(request: Request, dados: Login_schema, session: Session = Depends(pegar_sessao)):
     return login_usuario(dados=dados, session=session, request=request)
