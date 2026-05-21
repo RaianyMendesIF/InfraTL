@@ -16,4 +16,17 @@ class Funcionario_Schema_adicionar_response(BaseModel):
 
     class Config:
         from_attributes = True 
+
+class Funcionario_Schema_remover(BaseModel):
+    id_funcionario: int
+    id_usuario: int
+    
+    class Config:
+        from_attributes = True 
+    
+class Funcionario_Schema_remover_response(BaseModel):
+    id_usuario_alteracao: int
+
+    class Config:
+        from_attributes = True 
          

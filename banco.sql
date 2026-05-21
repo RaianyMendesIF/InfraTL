@@ -591,6 +591,24 @@ CREATE OR REPLACE TRIGGER trg_tipo_usuario_atualizado
     FOR EACH ROW 
     EXECUTE FUNCTION fn_set_tipo_usuario();
 
+--8.10 - altera o tipo_usuario quando não é mais admin
+CREATE OR REPLACE FUNCTION trg_rebaixar_usuario_desligado()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+    -- Quando o funcionário for apagado, volta o usuário para o nível comum
+    UPDATE usuario 
+    SET tipo_usuario = 'Usuario' 
+    WHERE id = OLD.id_usuario;
+
+    RETURN OLD;
+END;
+$$;
+
+CREATE TRIGGER tg_funcionario_deletado
+AFTER DELETE ON funcionario
+FOR EACH ROW
+EXECUTE FUNCTION trg_rebaixar_usuario_desligado();
+
 -- ROW LEVEL SECURITY (RLS) E ROLES
 
 -- Ativa RLS nas tabelas sensíveis
