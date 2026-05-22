@@ -128,17 +128,11 @@ def solicitar_recuperar_senha(dados: Usuario_recuperar_senha, session: Session):
             status_code=500, detail=f"Erro interno no banco de dados: {str(e)}"
         )
 
-def redefinir_senha_usuario(dados: Usuario_redefinir_senha, session: Session):
+
+def redefinir_senha_usuario(dados: Usuario_redefinir_senha, session: Session, usuario_atual: Usuario):
     try:
-        # 1. Abre o envelope (token) e vê se é válido e se não passou de 15 min
-        email = decodificar_token_recuperacao(dados.token)
-        
-        usuario = session.query(Usuario).filter(Usuario.email == email).first()
-            
-        if not usuario:
-            raise HTTPException(status_code=404, detail="Usuário não encontrado.")
-            
-        usuario.atualizar_senha(dados.nova_senha)
+
+        usuario_atual.atualizar_senha(dados.nova_senha)
         
         session.commit()
         
@@ -156,13 +150,12 @@ def redefinir_senha_usuario(dados: Usuario_redefinir_senha, session: Session):
         raise HTTPException(status_code=500, detail="Erro interno no servidor ao tentar salvar a senha.")
 
 
-
 def login_usuario(dados: Login_schema, session: Session, request: Request):
     try:
         ip_cliente = request.client.host if request and request.client else "0.0.0.0"
         ip_hash = gerar_hash_ip(ip_cliente)
 
-        usuario = session.query(Usuario).filter(Usuario.email == dados.email).first()
+        usuario = session.query(Usuario).filter(Usuario.email == dados.username).first()
         
         if not usuario:
             raise HTTPException(status_code=401, detail="E-mail ou senha incorretos")
@@ -175,7 +168,7 @@ def login_usuario(dados: Login_schema, session: Session, request: Request):
                 detail="Conta temporariamente bloqueada por múltiplas tentativas falhas."
             )
 
-        senha_valida = usuario.verificar_senha(dados.senha)
+        senha_valida = usuario.verificar_senha(dados.password)
         
         if not senha_valida:
             # Registra a falha no banco para disparar a trigger

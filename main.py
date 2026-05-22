@@ -7,7 +7,7 @@ from database import engine
 from views.Usuario.usuario import router_usuario
 from views.Ocorrencia.ocorrencia import router_ocorrencia
 from views.Funcionario.funcionario import router_funcionario
-from views.ocorrencia.triagem import router_triagem
+from views.Ocorrencia.triagem import router_triagem
 
 
 

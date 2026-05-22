@@ -15,8 +15,7 @@ class Usuario_schema_cadastro(BaseModel):
 
     class Config:
         from_attributes = True
-
-
+        
 class Usuario_response(BaseModel):
     id: int
     nome: str
@@ -32,12 +31,10 @@ class Usuario_response(BaseModel):
     class Config:
         from_attributes = True
 
-
 class Usuario_recuperar_senha(BaseModel):
     email: EmailStr
 
 class Usuario_redefinir_senha(BaseModel):
-    token: str
     nova_senha: str
     confirmar_senha: str 
 
@@ -50,7 +47,6 @@ class Usuario_redefinir_senha(BaseModel):
 class Login_schema(BaseModel):
     email: EmailStr
     senha: str
-
 
 class Token_response(BaseModel):
     access_token: str
