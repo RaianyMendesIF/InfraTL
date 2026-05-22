@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, ConfigDict
+from pydantic import BaseModel, EmailStr, ConfigDict, model_validator
 from typing import Optional
 from datetime import datetime, date
 from schemas.endereco_schemas import Endereco_schema_cadastro
@@ -36,6 +36,16 @@ class Usuario_response(BaseModel):
 class Usuario_recuperar_senha(BaseModel):
     email: EmailStr
 
+class Usuario_redefinir_senha(BaseModel):
+    token: str
+    nova_senha: str
+    confirmar_senha: str 
+
+    @model_validator(mode='after')
+    def verificar_senhas_iguais(self):
+        if self.nova_senha != self.confirmar_senha:
+            raise ValueError("As senhas informadas não coincidem.")
+        return self
 
 class Login_schema(BaseModel):
     email: EmailStr
