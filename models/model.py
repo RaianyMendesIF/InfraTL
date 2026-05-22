@@ -38,12 +38,6 @@ class Usuario(Base):
     id_endereco = Column("id_endereco", Integer, ForeignKey("endereco.id"))
     
     
-    __mapper_args__ = {
-        "polymorphic_identity": TipoUsuario.Usuario,
-        "polymorphic_on": tipo_usuario
-    }
-    
-    
     def __init__(self, nome, cpf, telefone, data_nascimento, email, senha,  id_endereco, tipo_usuario=TipoUsuario.Usuario, ativo=True, tentativas_login=0, bloqueado_ate=None):
         self.nome = nome
         self.cpf = cpf
@@ -66,18 +60,22 @@ class Usuario(Base):
 
     def verificar_senha(self, senha_pura):
         return bcrypt.checkpw(senha_pura.encode('utf-8'), self.senha_hash.encode('utf-8'))
+    
+    def atualizar_senha(self, nova_senha_pura: str):
+        self.senha_hash = self.gerar_hash_senha(nova_senha_pura)
             
     
-class Funcionario(Usuario):
+class Funcionario(Base):
     __tablename__ = "funcionario"
     
     id_usuario = Column("id_usuario", Integer, ForeignKey("usuario.id"), primary_key=True)  
     matricula = Column("matricula", String, nullable=False, unique=True)
     cargo = Column("cargo", String, nullable=False)
-    
-    __mapper_args__ = {
-        "polymorphic_identity": "funcionario",
-    }
+
+    def __init__(self, id_usuario, matricula, cargo):
+        self.id_usuario = id_usuario
+        self.matricula = matricula
+        self.cargo = cargo
     
     
     
