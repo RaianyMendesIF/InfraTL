@@ -6,8 +6,9 @@ import re
 import hashlib
 
 from models.model import Usuario, Bairro, Endereco, Funcionario
-from schemas.usuario_schemas import Usuario_response
-from utils.security import criar_token_jwt
+from schemas.usuario_schemas import Usuario_response, Login_schema, Usuario_recuperar_senha, Usuario_redefinir_senha, Usuario_schema_cadastro
+from utils.security import criar_token_jwt, token_recuperar_senha, decodificar_token_recuperacao, enviar_email_recuperacao, URL_FRONTEND_RECUPERACAO
+
 
 
 def gerar_hash_ip(ip: str) -> str:
@@ -15,7 +16,7 @@ def gerar_hash_ip(ip: str) -> str:
     return hashlib.sha256(ip.encode()).hexdigest()
 
 
-def cadastrar_usuario(dados, session):
+def cadastrar_usuario(dados: Usuario_schema_cadastro, session: Session):
     try:
         usuario = (
             session.query(Usuario).filter(Usuario.email == dados.email).first()
@@ -101,20 +102,22 @@ def cadastrar_usuario(dados, session):
         )
 
 
-def recuperar_senha(dados, session):
+def solicitar_recuperar_senha(dados: Usuario_recuperar_senha, session: Session):
     try:
         usuario = (
             session.query(Usuario).filter(Usuario.email == dados.email).first()
         )
         if usuario:
-            # Enviar e email de verificação
-            return {
-                "sucess": True,
-                "mensagem": "Usuário encotrado, email de recuperação enviado",
-            }
-        else:
-            return {"sucess": False, "mensagem": "Usuário não encotrado!"}
+            # Gera o token de 15 minutos
+            token = token_recuperar_senha(usuario.email)
+            
+            # O link que o seu Front-end vai abrir (exemplo)
+            url_base = URL_FRONTEND_RECUPERACAO
+            link = f"{url_base}?token={token}"
+            
+            enviar_email_recuperacao(email_destino=usuario.email, link_recuperacao=link)
 
+        return {"mensagem": "Se o e-mail estiver cadastrado, enviaremos um link de recuperação em instantes."}
     except HTTPException:
         raise
 
@@ -125,17 +128,41 @@ def recuperar_senha(dados, session):
             status_code=500, detail=f"Erro interno no banco de dados: {str(e)}"
         )
 
-
-def login_usuario(dados, session: Session, request: Request):
+def redefinir_senha_usuario(dados: Usuario_redefinir_senha, session: Session):
     try:
-        email = dados.email
-        senha = dados.senha
-        usuario = None
+        # 1. Abre o envelope (token) e vê se é válido e se não passou de 15 min
+        email = decodificar_token_recuperacao(dados.token)
+        
+        usuario = session.query(Usuario).filter(Usuario.email == email).first()
+            
+        if not usuario:
+            raise HTTPException(status_code=404, detail="Usuário não encontrado.")
+            
+        usuario.atualizar_senha(dados.nova_senha)
+        
+        session.commit()
+        
+        return {"mensagem": "Senha atualizada com sucesso! Você já pode fazer login."}
+    
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+        
+    except HTTPException:
+        raise
+        
+    except Exception as e:
+        session.rollback() 
+        print(f"ERRO AO REDEFINIR SENHA: {e}")
+        raise HTTPException(status_code=500, detail="Erro interno no servidor ao tentar salvar a senha.")
 
+
+
+def login_usuario(dados: Login_schema, session: Session, request: Request):
+    try:
         ip_cliente = request.client.host if request and request.client else "0.0.0.0"
         ip_hash = gerar_hash_ip(ip_cliente)
 
-        usuario = session.query(Usuario).filter(Usuario.email == email).first()
+        usuario = session.query(Usuario).filter(Usuario.email == dados.email).first()
         
         if not usuario:
             raise HTTPException(status_code=401, detail="E-mail ou senha incorretos")
@@ -148,7 +175,7 @@ def login_usuario(dados, session: Session, request: Request):
                 detail="Conta temporariamente bloqueada por múltiplas tentativas falhas."
             )
 
-        senha_valida = usuario.verificar_senha(senha)
+        senha_valida = usuario.verificar_senha(dados.senha)
         
         if not senha_valida:
             # Registra a falha no banco para disparar a trigger
