@@ -2,6 +2,7 @@ from fastapi import HTTPException
 from models.model import Ocorrencia, Endereco, Bairro
 from sqlalchemy.orm import Session
 from schemas.ocorrencia_schemas import Ocorrencia_schema_cadastro, Ocorrencia_schema_resposta
+from sqlalchemy import func
 
 class OcorrenciaController:
     @staticmethod
@@ -59,7 +60,8 @@ class OcorrenciaController:
             dados_ocorrencia = Ocorrencia_schema_resposta.model_validate(ocorrencia).model_dump()
 
             return {"sucess": True, "mensagem": "Ocorrencia cadastrado com sucesso!", "ocorrencia": dados_ocorrencia}
-
+        
+        
         except HTTPException:
             raise
             
@@ -67,3 +69,6 @@ class OcorrenciaController:
             session.rollback()
             print(f"ERRO DE BANCO: {e}")
             raise HTTPException(status_code=500, detail=f"Erro interno no banco de dados: {str(e)}")
+    @staticmethod
+    def buscar_ocorrencias_por_usuario(session: Session, id_usuario: int):
+        return session.query(Ocorrencia).filter(Ocorrencia.id_usuario == id_usuario).all()
