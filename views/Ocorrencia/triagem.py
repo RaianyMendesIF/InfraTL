@@ -28,15 +28,22 @@ async def listar_ocorrencias(
     - ?bairro=Centro&status=Pendente&tipo=Esgoto
     """
 
-    session.execute(text(f"SET LOCAL app.usuario_id = '{usuario_atual.id}';"))
+    # 1. Primeira chave: Informa o ID do usuário (Usando set_config para segurança)
+    session.execute(
+        text("SELECT set_config('app.usuario_id', :id, true)"),
+        {"id": str(usuario_atual.id)},
+    )
 
-    # 2. Segunda chave: Informa o tipo de acesso (extraindo o texto puro caso seja Enum)
+    # 2. Segunda chave: Informa o tipo de acesso
     tipo_str = (
         usuario_atual.tipo_usuario.value
         if hasattr(usuario_atual.tipo_usuario, "value")
         else usuario_atual.tipo_usuario
     )
-    session.execute(text(f"SET LOCAL app.tipo_usuario = '{tipo_str}';"))
+    session.execute(
+        text("SELECT set_config('app.tipo_usuario', :tipo, true)"),
+        {"tipo": str(tipo_str)},
+    )
 
     return await TriagemController.listar_ocorrencias(
         session=session, bairro=bairro, tipo=tipo, status=status

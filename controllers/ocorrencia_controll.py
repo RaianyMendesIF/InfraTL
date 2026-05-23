@@ -5,7 +5,7 @@ from schemas.ocorrencia_schemas import (
     Ocorrencia_schema_cadastro,
     Ocorrencia_schema_resposta,
 )
-from sqlalchemy import text
+from sqlalchemy import text, func
 
 
 class OcorrenciaController:

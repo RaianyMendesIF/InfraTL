@@ -15,6 +15,10 @@ export default function Dashboard({ onLogout, onNavigate }) {
     if (token) {
       try {
         const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+        while (base64.length % 4) {
+          base64 += '=';
+        }
+        
         const payload = JSON.parse(window.atob(base64));
         
         let nomeFinal = payload.nome;
