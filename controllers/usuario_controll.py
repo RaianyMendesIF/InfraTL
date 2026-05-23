@@ -6,9 +6,20 @@ import re
 import hashlib
 
 from models.model import Usuario, Bairro, Endereco, Funcionario
-from schemas.usuario_schemas import Usuario_response, Login_schema, Usuario_recuperar_senha, Usuario_redefinir_senha, Usuario_schema_cadastro
-from utils.security import criar_token_jwt, token_recuperar_senha, decodificar_token_recuperacao, enviar_email_recuperacao, URL_FRONTEND_RECUPERACAO
-
+from schemas.usuario_schemas import (
+    Usuario_response,
+    Login_schema,
+    Usuario_recuperar_senha,
+    Usuario_redefinir_senha,
+    Usuario_schema_cadastro,
+)
+from utils.security import (
+    criar_token_jwt,
+    token_recuperar_senha,
+    decodificar_token_recuperacao,
+    enviar_email_recuperacao,
+    URL_FRONTEND_RECUPERACAO,
+)
 
 
 def gerar_hash_ip(ip: str) -> str:
@@ -18,18 +29,14 @@ def gerar_hash_ip(ip: str) -> str:
 
 def cadastrar_usuario(dados: Usuario_schema_cadastro, session: Session):
     try:
-        usuario = (
-            session.query(Usuario).filter(Usuario.email == dados.email).first()
-        )
+        usuario = session.query(Usuario).filter(Usuario.email == dados.email).first()
         if usuario:
             raise HTTPException(
                 status_code=400, detail="Ja existe um usuario com esse email"
             )
 
         bairro = (
-            session.query(Bairro)
-            .filter(Bairro.nome == dados.endereco.bairro)
-            .first()
+            session.query(Bairro).filter(Bairro.nome == dados.endereco.bairro).first()
         )
         if not bairro:
             raise HTTPException(status_code=400, detail="Bairro não encontrado!")
@@ -104,20 +111,20 @@ def cadastrar_usuario(dados: Usuario_schema_cadastro, session: Session):
 
 def solicitar_recuperar_senha(dados: Usuario_recuperar_senha, session: Session):
     try:
-        usuario = (
-            session.query(Usuario).filter(Usuario.email == dados.email).first()
-        )
+        usuario = session.query(Usuario).filter(Usuario.email == dados.email).first()
         if usuario:
             # Gera o token de 15 minutos
             token = token_recuperar_senha(usuario.email)
-            
+
             # O link que o seu Front-end vai abrir (exemplo)
             url_base = URL_FRONTEND_RECUPERACAO
             link = f"{url_base}?token={token}"
-            
+
             enviar_email_recuperacao(email_destino=usuario.email, link_recuperacao=link)
 
-        return {"mensagem": "Se o e-mail estiver cadastrado, enviaremos um link de recuperação em instantes."}
+        return {
+            "mensagem": "Se o e-mail estiver cadastrado, enviaremos um link de recuperação em instantes."
+        }
     except HTTPException:
         raise
 
@@ -129,25 +136,29 @@ def solicitar_recuperar_senha(dados: Usuario_recuperar_senha, session: Session):
         )
 
 
-def redefinir_senha_usuario(dados: Usuario_redefinir_senha, session: Session, usuario_atual: Usuario):
+def redefinir_senha_usuario(
+    dados: Usuario_redefinir_senha, session: Session, usuario_atual: Usuario
+):
     try:
 
         usuario_atual.atualizar_senha(dados.nova_senha)
-        
+
         session.commit()
-        
+
         return {"mensagem": "Senha atualizada com sucesso! Você já pode fazer login."}
-    
+
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-        
+
     except HTTPException:
         raise
-        
+
     except Exception as e:
-        session.rollback() 
+        session.rollback()
         print(f"ERRO AO REDEFINIR SENHA: {e}")
-        raise HTTPException(status_code=500, detail="Erro interno no servidor ao tentar salvar a senha.")
+        raise HTTPException(
+            status_code=500, detail="Erro interno no servidor ao tentar salvar a senha."
+        )
 
 
 def login_usuario(dados: Login_schema, session: Session, request: Request):
@@ -156,7 +167,7 @@ def login_usuario(dados: Login_schema, session: Session, request: Request):
         ip_hash = gerar_hash_ip(ip_cliente)
 
         usuario = session.query(Usuario).filter(Usuario.email == dados.username).first()
-        
+
         if not usuario:
             raise HTTPException(status_code=401, detail="E-mail ou senha incorretos")
 
@@ -165,11 +176,11 @@ def login_usuario(dados: Login_schema, session: Session, request: Request):
         if usuario.bloqueado_ate and usuario.bloqueado_ate > agora_utc:
             raise HTTPException(
                 status_code=403,
-                detail="Conta temporariamente bloqueada por múltiplas tentativas falhas."
+                detail="Conta temporariamente bloqueada por múltiplas tentativas falhas.",
             )
 
         senha_valida = usuario.verificar_senha(dados.password)
-        
+
         if not senha_valida:
             # Registra a falha no banco para disparar a trigger
             session.execute(
@@ -194,10 +205,14 @@ def login_usuario(dados: Login_schema, session: Session, request: Request):
         session.commit()
 
         # 2. Gera o Token (Identificando o tipo de usuário - RF10)
-        tipo = usuario.tipo_usuario.value if hasattr(usuario.tipo_usuario, 'value') else usuario.tipo_usuario
-        
+        tipo = (
+            usuario.tipo_usuario.value
+            if hasattr(usuario.tipo_usuario, "value")
+            else usuario.tipo_usuario
+        )
+
         token = criar_token_jwt(
-            data={"sub": str(usuario.id), "tipo": tipo}
+            data={"sub": str(usuario.id), "nome": usuario.nome, "tipo_usuario": tipo}
         )
 
         # Filtra a senha antes de devolver os dados
@@ -211,7 +226,7 @@ def login_usuario(dados: Login_schema, session: Session, request: Request):
 
     except HTTPException:
         raise
-    
+
     except Exception as e:
         session.rollback()
         print(f"ERRO NO LOGIN: {e}")

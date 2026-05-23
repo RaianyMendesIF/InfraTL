@@ -19,12 +19,12 @@ export default function Dashboard({ onLogout, onNavigate }) {
         
         let nomeFinal = payload.nome;
         if (!nomeFinal) {
-           nomeFinal = isNaN(payload.sub) ? payload.sub : 'Ana Gestora';
+           nomeFinal = isNaN(payload.sub) ? payload.sub : `Usuário #${payload.sub}`;
         }
 
         setUsuario({ 
-          nome: nomeFinal, 
-          cargo: payload.cargo || 'Gestor' 
+          nome: String(nomeFinal), // Força a string para o Avatar não quebrar
+          cargo: payload.tipo_usuario || payload.cargo || 'Cidadão' 
         });
       } catch (e) {
         setUsuario({ nome: 'Ana Gestora', cargo: 'Gestora' });
@@ -60,7 +60,7 @@ export default function Dashboard({ onLogout, onNavigate }) {
       } catch (error) {
         console.error("❌ O servidor FastAPI está desligado:", error);
       } finally {
-        setLoading(false); // Desliga o aviso de "Carregando dados..."
+        setLoading(false);
       }
     };
 
@@ -101,7 +101,7 @@ export default function Dashboard({ onLogout, onNavigate }) {
           </div>
         </div>
 
-        <nav className="flex-1 px-4 space-y-2 mt-4">
+        <nav className="flex-1 px-4 space-y-2 mt-4 overflow-y-auto">
           <a href="#" className="flex items-center gap-3 bg-blue-600 text-white px-4 py-3 rounded-lg font-medium">
             <LayoutDashboard className="w-5 h-5" /> Visao Geral
           </a>
@@ -130,30 +130,30 @@ export default function Dashboard({ onLogout, onNavigate }) {
       <main className="flex-1 flex flex-col overflow-hidden">
         
         {/* HEADER */}
-        <header className="bg-white border-b border-slate-200 h-16 flex items-center justify-between px-8 shrink-0">
-          <div className="flex gap-4 w-full max-w-2xl">
+        <header className="bg-white border-b border-slate-200 h-16 flex items-center justify-between px-4 lg:px-8 shrink-0">
+          <div className="flex gap-4 flex-1 max-w-2xl mr-4">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input type="text" placeholder="Buscar ocorrencias, enderecos, categorias..." 
                 className="w-full pl-10 pr-4 py-2 bg-slate-100 border-transparent rounded-lg text-sm focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all" />
             </div>
-            <button className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 text-sm font-medium">
+            <button className="hidden sm:flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 text-sm font-medium">
               <SlidersHorizontal className="w-4 h-4" /> Filtros
             </button>
           </div>
 
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-4 lg:gap-6 shrink-0">
             <button className="relative text-slate-500 hover:text-slate-700">
               <Bell className="w-5 h-5" />
               <span className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
             </button>
-            <div className="flex items-center gap-3 border-l border-slate-200 pl-6">
-              <div className="text-right">
+            <div className="flex items-center gap-3 border-l border-slate-200 pl-4 lg:pl-6">
+              <div className="text-right hidden sm:block">
                 <p className="text-sm font-semibold text-slate-700">{usuario.nome}</p>
                 <p className="text-xs text-slate-500">{usuario.cargo}</p>
               </div>
-              <div className="w-10 h-10 rounded-full bg-teal-600 text-white flex items-center justify-center font-bold">
-                {usuario.nome.substring(0, 2).toUpperCase()}
+              <div className="w-10 h-10 shrink-0 rounded-full bg-teal-600 text-white flex items-center justify-center font-bold">
+                {String(usuario.nome || 'US').substring(0, 2).toUpperCase()}
               </div>
             </div>
           </div>
@@ -243,33 +243,15 @@ export default function Dashboard({ onLogout, onNavigate }) {
                   </div>
                 ))
               ) : (
-                // DADOS MOCKADOS (Aparecem se o banco estiver vazio para manter o design visível)
-                <>
-                  <div className="p-6 flex items-start justify-between hover:bg-slate-50">
-                    <div>
-                      <div className="flex items-center gap-3 mb-2">
-                        <span className="text-sm font-semibold text-slate-500">#2847</span>
-                        <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">• Pendente</span>
-                      </div>
-                      <h4 className="font-semibold text-slate-800 mb-1">Buraco na Via</h4>
-                      <p className="text-sm text-slate-500 mb-1">Av. Principal, 1245 - Centro</p>
-                      <p className="text-xs text-slate-400">10/03/2026</p>
-                    </div>
-                    <button className="p-2 hover:bg-slate-200 rounded-lg text-slate-400"><MoreHorizontal className="w-5 h-5" /></button>
+                <div className="p-12 text-center flex flex-col items-center justify-center">
+                  <div className="bg-slate-100 p-4 rounded-full mb-4">
+                    <ClipboardList className="w-8 h-8 text-slate-400" />
                   </div>
-                  <div className="p-6 flex items-start justify-between hover:bg-slate-50">
-                    <div>
-                      <div className="flex items-center gap-3 mb-2">
-                        <span className="text-sm font-semibold text-slate-500">#2846</span>
-                        <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">• Em Execucao</span>
-                      </div>
-                      <h4 className="font-semibold text-slate-800 mb-1">Iluminacao Publica</h4>
-                      <p className="text-sm text-slate-500 mb-1">Rua das Flores, 856 - Jardim</p>
-                      <p className="text-xs text-slate-400">10/03/2026</p>
-                    </div>
-                    <button className="p-2 hover:bg-slate-200 rounded-lg text-slate-400"><MoreHorizontal className="w-5 h-5" /></button>
-                  </div>
-                </>
+                  <h4 className="text-lg font-semibold text-slate-700 mb-1">Nenhuma ocorrência encontrada</h4>
+                  <p className="text-sm text-slate-500 max-w-md mx-auto">
+                    Você ainda não possui solicitações registradas ou não tem permissão para visualizar estes dados.
+                  </p>
+                </div>
               )}
             </div>
           </div>
