@@ -6,7 +6,7 @@ import {
 
 export default function Configuracoes({ onLogout, onNavigate }) {
   const [activeTab, setActiveTab] = useState('perfil');
-  const [usuario, setUsuario] = useState({ nome: 'Admin Municipal', email: 'admin@prefeitura.gov.br' });
+  const [usuario, setUsuario] = useState({ nome: 'Carregando...', email: '', cargo: 'Cidadão' });
 
   // Estados para a tela de Gestão de Equipe
   const [idAdicionar, setIdAdicionar] = useState('');
@@ -14,14 +14,33 @@ export default function Configuracoes({ onLogout, onNavigate }) {
   const [cargo, setCargo] = useState('Agente');
   const [idRemover, setIdRemover] = useState('');
 
-  // Tenta puxar os dados reais do usuário logado se estiverem no localStorage
+  // Tenta puxar os dados reais do usuário logado decodificando o token (Igual ao Dashboard)
   useEffect(() => {
-    const userStr = localStorage.getItem('usuario');
-    if (userStr) {
+    const token = localStorage.getItem('token');
+    if (token) {
       try {
-        const userObj = JSON.parse(userStr);
-        setUsuario(userObj);
-      } catch (e) {}
+        const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+        // Adiciona o padding para evitar erro de Base64
+        let base64Padded = base64;
+        while (base64Padded.length % 4) {
+            base64Padded += '=';
+        }
+        
+        const payload = JSON.parse(window.atob(base64Padded));
+        
+        let nomeFinal = payload.nome;
+        if (!nomeFinal) {
+           nomeFinal = isNaN(payload.sub) ? payload.sub : `Usuário #${payload.sub}`;
+        }
+
+        setUsuario({ 
+          nome: String(nomeFinal),
+          email: payload.email || 'Email não informado',
+          cargo: payload.tipo_usuario || payload.cargo || 'Cidadão' 
+        });
+      } catch (e) {
+        // Fallback
+      }
     }
   }, []);
 
@@ -74,7 +93,7 @@ export default function Configuracoes({ onLogout, onNavigate }) {
   return (
     <div className="flex h-screen bg-slate-50 font-sans">
       
-      {/* SIDEBAR (Menu Lateral) - Igual ao Dashboard */}
+      {/* SIDEBAR (Menu Lateral) */}
       <aside className="w-64 bg-[#1e293b] text-slate-300 flex flex-col shrink-0">
         <div className="p-6 flex items-center gap-3">
           <div className="bg-white p-1 rounded">
@@ -86,7 +105,7 @@ export default function Configuracoes({ onLogout, onNavigate }) {
           </div>
         </div>
 
-        <nav className="flex-1 px-4 space-y-2 mt-4">
+        <nav className="flex-1 px-4 space-y-2 mt-4 overflow-y-auto">
           <button onClick={() => onNavigate('dashboard')} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-800 rounded-lg transition-colors text-left">
             <LayoutDashboard className="w-5 h-5" /> Visao Geral
           </button>
@@ -114,30 +133,31 @@ export default function Configuracoes({ onLogout, onNavigate }) {
       {/* ÁREA PRINCIPAL */}
       <main className="flex-1 flex flex-col overflow-hidden">
         
-        {/* HEADER - Igual ao Dashboard */}
-        <header className="bg-white border-b border-slate-200 h-16 flex items-center justify-between px-8 shrink-0">
-          <div className="flex gap-4 w-full max-w-2xl">
+        {/* HEADER */}
+        <header className="bg-white border-b border-slate-200 h-16 flex items-center justify-between px-4 lg:px-8 shrink-0">
+          <div className="flex gap-4 flex-1 max-w-2xl mr-4">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input type="text" placeholder="Buscar ocorrencias, enderecos, categorias..." 
                 className="w-full pl-10 pr-4 py-2 bg-slate-100 border-transparent rounded-lg text-sm focus:bg-white focus:border-blue-500 outline-none transition-all" />
             </div>
-            <button className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 text-sm font-medium">
+            <button className="hidden sm:flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 text-sm font-medium">
               <SlidersHorizontal className="w-4 h-4" /> Filtros
             </button>
           </div>
 
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-4 lg:gap-6 shrink-0">
             <button className="relative text-slate-500 hover:text-slate-700">
               <Bell className="w-5 h-5" />
             </button>
-            <div className="flex items-center gap-3 border-l border-slate-200 pl-6">
-              <div className="text-right">
+            <div className="flex items-center gap-3 border-l border-slate-200 pl-4 lg:pl-6">
+              <div className="text-right hidden sm:block">
                 <p className="text-sm font-semibold text-slate-700">{usuario.nome}</p>
-                <p className="text-xs text-slate-500">Administrador</p>
+                {/* Agora exibe o cargo real do usuário em vez de um texto fixo */}
+                <p className="text-xs text-slate-500">{usuario.cargo}</p>
               </div>
-              <div className="w-10 h-10 rounded-full bg-teal-600 text-white flex items-center justify-center font-bold">
-                {usuario.nome.substring(0, 2).toUpperCase()}
+              <div className="w-10 h-10 shrink-0 rounded-full bg-teal-600 text-white flex items-center justify-center font-bold">
+                {String(usuario.nome || 'US').substring(0, 2).toUpperCase()}
               </div>
             </div>
           </div>
@@ -152,21 +172,26 @@ export default function Configuracoes({ onLogout, onNavigate }) {
 
           <div className="flex flex-col md:flex-row gap-8">
             
-            {/* SUB-MENU ESQUERDO (Figma) */}
+            {/* SUB-MENU ESQUERDO */}
             <div className="w-full md:w-64 shrink-0 bg-white border border-slate-200 rounded-xl p-2 h-fit">
-              <nav className="flex flex-col gap-1 text-sm font-medium">
+            <nav className="flex flex-col gap-1 text-sm font-medium">
                 <button 
                   onClick={() => setActiveTab('perfil')}
                   className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors ${activeTab === 'perfil' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50'}`}
                 >
                   <User className="w-4 h-4" /> Perfil
                 </button>
+
+                {/* Só mostra a aba se o cargo do usuário incluir "Gestor" ou "Admin" */}
+                {(usuario.cargo?.includes('Gestor') || usuario.cargo?.includes('Admin')) && (
                 <button 
                   onClick={() => setActiveTab('equipe')}
                   className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors ${activeTab === 'equipe' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50'}`}
                 >
                   <Users className="w-4 h-4" /> Gestao de Equipe
                 </button>
+                )}
+
                 <button className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors">
                   <Bell className="w-4 h-4" /> Notificacoes
                 </button>
@@ -190,7 +215,7 @@ export default function Configuracoes({ onLogout, onNavigate }) {
                   <div className="flex items-center gap-6 mb-8">
                     <div className="relative">
                       <div className="w-20 h-20 rounded-full bg-teal-500 text-white flex items-center justify-center text-3xl font-bold">
-                        {usuario.nome.substring(0, 2).toUpperCase()}
+                        {String(usuario.nome || 'US').substring(0, 2).toUpperCase()}
                       </div>
                       <button className="absolute bottom-0 right-0 p-1.5 bg-white border border-slate-200 rounded-full text-slate-600 hover:bg-slate-50">
                         <Camera className="w-4 h-4" />
@@ -198,34 +223,64 @@ export default function Configuracoes({ onLogout, onNavigate }) {
                     </div>
                     <div>
                       <h3 className="text-xl font-bold text-slate-800">{usuario.nome}</h3>
-                      <p className="text-slate-500 text-sm mb-1">Administrador do Sistema</p>
+                      <p className="text-slate-500 text-sm mb-1">{usuario.cargo}</p>
                       <button className="text-blue-600 text-sm font-medium hover:underline">Alterar foto</button>
                     </div>
                   </div>
 
                   <form className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      
+                      {/* Campos editáveis */}
                       <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Nome completo</label>
                         <input type="text" defaultValue={usuario.nome} className="w-full px-4 py-2 border border-slate-300 rounded-lg text-slate-700" />
                       </div>
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">E-mail institucional</label>
-                        <input type="email" defaultValue={usuario.email} className="w-full px-4 py-2 border border-slate-300 rounded-lg text-slate-700" />
-                      </div>
+                      
                       <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Telefone</label>
                         <input type="text" defaultValue="(67) 99999-0000" className="w-full px-4 py-2 border border-slate-300 rounded-lg text-slate-700" />
                       </div>
+
+                      {/* Campos Bloqueados (disabled) */}
                       <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Secretaria</label>
-                        <input type="text" defaultValue="Administracao" className="w-full px-4 py-2 border border-slate-300 rounded-lg text-slate-700" />
+                        <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-2">
+                          E-mail institucional <Shield className="w-3 h-3 text-slate-400" />
+                        </label>
+                        <input 
+                          type="email" 
+                          defaultValue={usuario.email || "Email restrito"} 
+                          disabled 
+                          className="w-full px-4 py-2 bg-slate-100 border border-slate-200 rounded-lg text-slate-500 cursor-not-allowed outline-none" 
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-2">
+                          Secretaria <Shield className="w-3 h-3 text-slate-400" />
+                        </label>
+                        <input 
+                          type="text" 
+                          defaultValue="Administracao" 
+                          disabled 
+                          className="w-full px-4 py-2 bg-slate-100 border border-slate-200 rounded-lg text-slate-500 cursor-not-allowed outline-none" 
+                        />
                       </div>
                     </div>
+                    
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">Cargo</label>
-                      <input type="text" defaultValue="Administrador Municipal - Secretario Adjunto" className="w-full px-4 py-2 border border-slate-300 rounded-lg text-slate-700" />
+                      <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-2">
+                        Cargo e Privilégios <Shield className="w-3 h-3 text-slate-400" />
+                      </label>
+                      <input 
+                        type="text" 
+                        defaultValue={usuario.cargo} 
+                        disabled 
+                        className="w-full px-4 py-2 bg-slate-100 border border-slate-200 rounded-lg text-slate-500 cursor-not-allowed outline-none" 
+                      />
+                      <p className="text-xs text-slate-400 mt-2">Alterações de e-mail institucional, cargo ou secretaria devem ser solicitadas à Gestão de Equipe.</p>
                     </div>
+
                     <div className="flex justify-end pt-4">
                       <button type="button" className="bg-blue-600 text-white font-medium px-6 py-2.5 rounded-lg hover:bg-blue-700 transition-colors">
                         Salvar Alteracoes
