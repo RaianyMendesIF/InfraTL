@@ -91,6 +91,9 @@ class OcorrenciaController:
         except Exception as e:
             session.rollback()
             print(f"ERRO DE BANCO: {e}")
-            raise HTTPException(
-                status_code=500, detail=f"Erro interno no banco de dados: {str(e)}"
-            )
+            raise HTTPException(status_code=500, detail=f"Erro interno no banco de dados: {str(e)}")
+            
+    @staticmethod
+    def buscar_ocorrencias_por_usuario(session: Session, id_usuario: int):
+        return session.query(Ocorrencia).filter(Ocorrencia.id_usuario == id_usuario).all()
+

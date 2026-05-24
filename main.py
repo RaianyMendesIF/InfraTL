@@ -4,6 +4,7 @@ from models.model import Base
 from fastapi.middleware.cors import CORSMiddleware
 from database import engine
 
+
 from views.Usuario.usuario import router_usuario
 from views.Ocorrencia.ocorrencia import router_ocorrencia
 from views.Funcionario.funcionario import router_funcionario
