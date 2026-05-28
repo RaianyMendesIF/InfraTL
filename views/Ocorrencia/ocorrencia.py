@@ -23,7 +23,7 @@ async def cadastrar_ocorrencia(
     return await OcorrenciaController.cadastrar_ocorrencia(dados=dados, session=session)
   
 @router_ocorrencia.get("/minhas", response_model=List[Ocorrencia_schema_resposta])
-async def def listar_minhas_ocorrencias(
+async def listar_minhas_ocorrencias(
     session: Session = Depends(pegar_sessao),
     usuario_atual: Usuario = Depends(get_current_user)
 ):
