@@ -22,3 +22,8 @@ class Ocorrencia_schema_resposta(BaseModel):
     id_servico: int
     id_endereco: int
     model_config = ConfigDict(from_attributes=True)
+    
+
+class Avaliar_ocorrencia_schema(BaseModel):
+    aprovado: bool
+    justificativa: Optional[str] = None

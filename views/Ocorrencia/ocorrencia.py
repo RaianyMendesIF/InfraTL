@@ -7,8 +7,9 @@ from models.model import Ocorrencia, Usuario
 from schemas.ocorrencia_schemas import (
     Ocorrencia_schema_resposta,
     Ocorrencia_schema_cadastro,
+    Avaliar_ocorrencia_schema
 )
-from controllers.ocorrencia_controll import OcorrenciaController
+from controllers.ocorrencia_controll import OcorrenciaController, avaliar_ocorrencia
 from utils.security import get_current_user, get_current_admin
 from fastapi.security import OAuth2PasswordRequestForm
 
@@ -31,4 +32,14 @@ async def listar_minhas_ocorrencias(
     return OcorrenciaController.buscar_ocorrencias_por_usuario(
         session=session, 
         id_usuario=usuario_atual.id
+    )
+    
+@router_ocorrencia.patch("/{id_ocorrencia}/avaliar")
+async def avaliacao_ocorrencia(id_ocorrencia: int, dados: Avaliar_ocorrencia_schema, session: Session = Depends(pegar_sessao), id_admin: Usuario = Depends(get_current_admin)):
+    
+    return avaliar_ocorrencia(
+        id_ocorrencia = id_ocorrencia,
+        dados = dados,
+        session = session,
+        id_admin = id_admin.id
     )
