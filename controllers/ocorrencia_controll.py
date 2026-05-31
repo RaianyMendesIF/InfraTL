@@ -3,7 +3,7 @@ from models.model import Ocorrencia, Endereco, Bairro
 from sqlalchemy.orm import Session
 from schemas.ocorrencia_schemas import (
     Ocorrencia_schema_cadastro,
-    Ocorrencia_schema_resposta,
+    Ocorrencia_schema_resposta, Avaliar_ocorrencia_schema
 )
 from sqlalchemy import text, func
 
@@ -97,3 +97,34 @@ class OcorrenciaController:
     def buscar_ocorrencias_por_usuario(session: Session, id_usuario: int):
         return session.query(Ocorrencia).filter(Ocorrencia.id_usuario == id_usuario).all()
 
+def avaliar_ocorrencia(id_ocorrencia: int, dados: Avaliar_ocorrencia_schema, session: Session, id_agente: int):
+    ocorrencia = session.query(Ocorrencia).filter(Ocorrencia.id == id_ocorrencia).first()
+    
+    if not ocorrencia:
+        raise HTTPException(status_code=404, detail="Ocorrencia nao encontrada")
+    
+    if ocorrencia.status != "Em_Analise":
+        raise HTTPException(status_code=400, detail=f"A ocorrencia nao pode ser avaliada pois ja esta em status: {ocorrencia.status}")
+    
+    if dados.aprovado:
+        ocorrencia.status = "Pendente"
+        ocorrencia.justificativa = None
+    else:
+        if not dados.justificativa:
+            raise HTTPException(status_code=400, detail="Necessario passar uma justificativa para o arquivamento da ocorrencia")
+        ocorrencia.status = "Arquivado"
+        ocorrencia.justificativa = dados.justificativa
+        
+    ocorrencia.id_agente_triagem = id_agente
+    
+    session.commit()
+    session.refresh(ocorrencia)
+    
+    acao_texto = "aprovada" if dados.aprovado else "reprovada"
+    return {
+        "mensagem": f"Ocorrência {acao_texto} com sucesso!", 
+        "novo_status": ocorrencia.status
+    }
+    
+    
+        
