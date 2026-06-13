@@ -11,7 +11,6 @@ from views.Funcionario.funcionario import router_funcionario
 from views.Ocorrencia.triagem import router_triagem
 
 
-
 origins = [
     "http://localhost:8000",
     "http://127.0.0.1:8000"
