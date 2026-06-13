@@ -22,7 +22,6 @@ router_usuario = APIRouter(prefix="/auth", tags=["Autentificacao"])
 async def criar_conta(dados: Usuario_schema_cadastro, session: Session = Depends(pegar_sessao)):
     return cadastrar_usuario(dados=dados, session=session)
 
-
 @router_usuario.post("/login", response_model=Token_response)
 async def login(request: Request, dados: OAuth2PasswordRequestForm = Depends(), session: Session = Depends(pegar_sessao)):
     return login_usuario(dados=dados, session=session, request=request)

@@ -9,6 +9,7 @@ from views.Usuario.usuario import router_usuario
 from views.Ocorrencia.ocorrencia import router_ocorrencia
 from views.Funcionario.funcionario import router_funcionario
 from views.Ocorrencia.triagem import router_triagem
+from views.Bairros.bairros import router_bairros
 
 
 origins = [
@@ -33,6 +34,7 @@ app.include_router(router_usuario)
 app.include_router(router_ocorrencia) 
 app.include_router(router_funcionario) 
 app.include_router(router_triagem) 
+app.include_router(router_bairros)
 
   
 if __name__ == "__main__":  

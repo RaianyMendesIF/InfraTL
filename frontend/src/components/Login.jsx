@@ -43,21 +43,6 @@ export default function Login({ onNavigate, onLoginSuccess, onNavigateRecuperar 
           <h2 className="text-3xl font-bold text-slate-800 mb-2">Bem-vindo de volta</h2>
           <p className="text-slate-500 mb-8">Acesse sua conta para gerenciar o painel de zeladoria urbana.</p>
 
-          <div className="flex bg-slate-100 p-1 rounded-lg mb-6">
-            <button 
-              onClick={() => setTipo('Cidadão')}
-              className={`flex-1 py-2 rounded-md text-sm font-medium transition-colors ${tipo === 'Cidadão' ? 'bg-white shadow text-blue-600' : 'text-slate-500'}`}
-            >
-              Cidadão
-            </button>
-            <button 
-              onClick={() => setTipo('Funcionário')}
-              className={`flex-1 py-2 rounded-md text-sm font-medium transition-colors ${tipo === 'Funcionário' ? 'bg-white shadow text-blue-600' : 'text-slate-500'}`}
-            >
-              Funcionário
-            </button>
-          </div>
-
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">E-mail</label>

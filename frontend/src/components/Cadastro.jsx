@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import SidePanel from './SidePanel';
 
 export default function Cadastro({ onNavigate }) {
@@ -7,6 +7,32 @@ export default function Cadastro({ onNavigate }) {
     nome: '', cpf: '', telefone: '', data_nascimento: '', email: '', senha: '',
     rua: '', numero: '', bairro: ''
   });
+
+  // Novo estado para armazenar a lista de bairros vindos do banco
+  const [bairros, setBairros] = useState([]);
+  const [loadingBairros, setLoadingBairros] = useState(true);
+
+  // Busca os bairros ao carregar o componente
+  useEffect(() => {
+    const buscarBairros = async () => {
+      try {
+        const response = await fetch('http://localhost:8000/bairros'); // Ajuste a rota se necessário
+        if (response.ok) {
+          const data = await response.json();
+          // Certifique-se de que 'data' seja um array de strings ou objetos
+          setBairros(data);
+        } else {
+          console.error('Erro ao carregar bairros');
+        }
+      } catch (error) {
+        console.error('Erro de conexão ao buscar bairros:', error);
+      } finally {
+        setLoadingBairros(false);
+      }
+    };
+
+    buscarBairros();
+  }, []);
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
@@ -98,8 +124,27 @@ export default function Cadastro({ onNavigate }) {
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Bairro (Precisa existir no BD)</label>
-              <input type="text" name="bairro" value={form.bairro} onChange={handleChange} placeholder="Ex: Centro" required className="w-full px-4 py-2 border border-slate-300 rounded-lg" />
+              <label className="block text-sm font-medium text-slate-700 mb-1">Bairro</label>
+              <select 
+                name="bairro" 
+                value={form.bairro} 
+                onChange={handleChange} 
+                required 
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg bg-white"
+                disabled={loadingBairros}
+              >
+                <option value="">{loadingBairros ? 'Carregando bairros...' : 'Selecione um bairro'}</option>
+                {bairros.map((bairro, index) => {
+                  // Se sua API retornar uma lista de strings: ['Centro', 'Alvorada']
+                  // Se retornar objetos (ex: {id: 1, nome: 'Centro'}), mude para bairro.nome
+                  const nomeBairro = typeof bairro === 'object' ? bairro.nome : bairro;
+                  return (
+                    <option key={index} value={nomeBairro}>
+                      {nomeBairro}
+                    </option>
+                  );
+                })}
+              </select>
             </div>
 
             <div>

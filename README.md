@@ -25,3 +25,5 @@ Inserir no .env
 ```DATABASE_URL="postgresql://usuario:senha@localhost:5432/nome_do_banco"```
 
 postgresql://infratl_app:TROQUE_EM_PRODUCAO_app@ep-ancient-haze-aqp932zq-pooler.c-8.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
+
+"postgresql://usuario:senha@localhost:5432/meubanco"
