@@ -1,15 +1,27 @@
 # InfraTL
 SISTEMAS INTELIGENTE DE ZELADORIA URBANA
 
-python -m venv venv
+## Comandos
 
-- Windows: .\venv\Scripts\activate
-- Windows: deactivate
+Criar o ambiente Venv <br>
+```python -m venv venv```
 
-- Linux/Mac: source venv/bin/activate
+Ativar o ambiente venv <br>
+```.\venv\Scripts\activate```
 
-pip install fastapi uvicorn
+Instalar a extenção do uvicorn <br>
+```pip install fastapi uvicorn```
 
-pip install -r requirements.txt
+Criar as dependencias no requeriments <br>
+```pip freeze > requirements.txt```
 
-uvicorn main:app --reload
+Instalar os arquivos do requeriments <br>
+```pip install -r requirements.txt```
+
+Executar o projeto FAST API <br>
+```uvicorn main:app --reload```
+
+Inserir no .env
+```DATABASE_URL="postgresql://usuario:senha@localhost:5432/nome_do_banco"```
+
+postgresql://infratl_app:TROQUE_EM_PRODUCAO_app@ep-ancient-haze-aqp932zq-pooler.c-8.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require

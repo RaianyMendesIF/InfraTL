@@ -1,91 +1,81 @@
-from sqlalchemy import create_engine, Column, String, Integer, Boolean, Float, ForeignKey, DateTime, Date, Enum
+from sqlalchemy import Column, String, Integer, Boolean, Float, ForeignKey, DateTime, Date, Enum
 from sqlalchemy.orm import declarative_base
-from datetime import datetime
+from sqlalchemy.sql import func
+from datetime import datetime, timezone
 from passlib.context import CryptContext
 import enum
-
-URL_BANCO = "postgresql://neondb_owner:npg_AiVogyHYIL34@ep-noisy-cherry-acnubdfk.sa-east-1.aws.neon.tech/neondb?sslmode=require"
-
-db = create_engine(URL_BANCO)
+import bcrypt
+from geoalchemy2 import Geography
 
 Base = declarative_base()
+
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 class TipoUsuario(enum.Enum):
-    Cidadao = "Cidadao"
+    Usuario = "Usuario"
+    Admin = "Admin"
+
+class CargoFuncionario(enum.Enum):
     Agente = "Agente"
     Gestor = "Gestor"
-
 
 class Usuario(Base):
     __tablename__ = "usuario"
     
     id = Column("id", Integer, primary_key=True, autoincrement=True)
     nome = Column("nome", String, nullable=False)
+    cpf = Column("cpf", String, nullable=False)
+    telefone = Column("telefone", String, nullable=False)
+    data_nascimento = Column("data_nascimento", Date, nullable=False)
     email = Column("email", String, nullable=False, unique=True)
     senha_hash = Column("senha_hash", String, nullable=False)
-    tipo_usuario = Column(Enum(TipoUsuario), nullable=False, default=TipoUsuario.Cidadao)
+    tipo_usuario = Column(Enum(TipoUsuario), nullable=False, default=TipoUsuario.Usuario)
     ativo = Column("ativo", Boolean, nullable=False, default=True)
     tentativas_login = Column("tentativas_login", Integer, nullable=False, default=0)
-    bloqueado_ate = Column("bloqueado_ate", DateTime, default=None)
-    criado_em = Column("criado_em", DateTime, nullable=False, default=datetime.now)
-    atualizado_em = Column("atualizado_em", DateTime, nullable=False, default=datetime.now, onupdate=datetime.now)
+    bloqueado_ate = Column("bloqueado_ate", DateTime(timezone=True), default=None)
+    criado_em = Column("criado_em", DateTime(timezone=True), nullable=False, default=func.now())
+    atualizado_em = Column("atualizado_em", DateTime, nullable=False, default=func.now(), onupdate=func.now())
+    id_endereco = Column("id_endereco", Integer, ForeignKey("endereco.id"))
     
-    tipo = Column(String)
     
-    __mapper_args__ = {
-        "polymorphic_identity": "usuario",
-        "polymorphic_on": tipo
-    }
-    
-    def __init__(self, nome, email, senha, tipo_usuario=TipoUsuario.Cidadao, ativo=True, tentativas_login=0, bloqueado_ate=None):
+    def __init__(self, nome, cpf, telefone, data_nascimento, email, senha,  id_endereco, tipo_usuario=TipoUsuario.Usuario, ativo=True, tentativas_login=0, bloqueado_ate=None):
         self.nome = nome
+        self.cpf = cpf
+        self.telefone = telefone
+        self.data_nascimento = data_nascimento
         self.email = email
-        self.senha_hash = pwd_context.hash(senha)
+        self.senha_hash = self.gerar_hash_senha(senha)
+        self.id_endereco = id_endereco
         self.tipo_usuario = tipo_usuario
         self.ativo = ativo
         self.tentativas_login = tentativas_login
         self.bloqueado_ate = bloqueado_ate
-        
-        
-    def verificar_senha(self, senha_pura):
-        """Método útil para validar a senha durante o login.
-        Adicionei esse método porque, uma vez que a senha é hasheada,
-        você não consegue mais ler o valor original. Para logar o usuário depois,
-        você precisará usar o pwd_context.verify
-        """
-        return pwd_context.verify(senha_pura, self.senha_hash)
-        
-        
-        
-        
+       
+    
+    def gerar_hash_senha(self, senha_pura):
+        senha_bytes = senha_pura.encode('utf-8')
+        salt = bcrypt.gensalt()
+        hash_bytes = bcrypt.hashpw(senha_bytes, salt)
+        return hash_bytes.decode('utf-8')
 
-class Cidadao(Usuario):
-    __tablename__ = "cidadao"
+    def verificar_senha(self, senha_pura):
+        return bcrypt.checkpw(senha_pura.encode('utf-8'), self.senha_hash.encode('utf-8'))
     
-    id_usuario = Column("id_usuario", Integer, ForeignKey("usuario.id"), primary_key=True)
-    cpf = Column('cpf', String(11), nullable=False, unique=True)
-    telefone = Column('telefone', String(15))
-    data_nascimento = Column('data_nascimento', Date, nullable=False)  
+    def atualizar_senha(self, nova_senha_pura: str):
+        self.senha_hash = self.gerar_hash_senha(nova_senha_pura)
+            
     
-    __mapper_args__ = {
-        "polymorphic_identity": "cidadao",
-    }
-    
-    
-    
-    
-    
-class Funcionario(Usuario):
+class Funcionario(Base):
     __tablename__ = "funcionario"
     
     id_usuario = Column("id_usuario", Integer, ForeignKey("usuario.id"), primary_key=True)  
     matricula = Column("matricula", String, nullable=False, unique=True)
     cargo = Column("cargo", String, nullable=False)
-    
-    __mapper_args__ = {
-        "polymorphic_identity": "funcionario",
-    }
+
+    def __init__(self, id_usuario, matricula, cargo):
+        self.id_usuario = id_usuario
+        self.matricula = matricula
+        self.cargo = cargo
     
     
     
@@ -100,16 +90,18 @@ class Endereco(Base):
     numero = Column("numero", String(20))
     complemento = Column("complemento", String(100), default=None)
     id_bairro = Column("id_bairro", Integer, ForeignKey("bairro.id"), nullable=False)
+    coordenadas = Column(Geography(geometry_type="POINT", srid=4326), nullable=True, default=None)
     latitude = Column('latitude', Float, default=None)
     longitude = Column('longitude', Float, default=None)
     fonte_localizacao = Column('fonte_localizacao', String, default='manual')
     
-    def __init__(self, id_bairro, rua, numero, complemento=None, endereco_completo=None, latitude=None, longitude=None, fonte_localizacao='manual'):
+    def __init__(self, id_bairro, rua, numero, complemento=None, endereco_completo=None, coordenadas=None, latitude=None, longitude=None, fonte_localizacao='manual'):
         self.id_bairro = id_bairro
         self.rua = rua
         self.numero = numero
         self.complemento = complemento
         self.endereco_completo = endereco_completo
+        self.coordenadas = coordenadas
         self.latitude = latitude
         self.longitude = longitude
         self.fonte_localizacao = fonte_localizacao
@@ -148,20 +140,20 @@ class Ocorrencia(Base):
     justificativa = Column("justificativa", String(300), default=None)
     data_abertura = Column("data_abertura", DateTime, default=datetime.now, nullable=False)
     data_fechamento = Column("data_fechamento", DateTime)
-    id_cidadao = Column("id_cidadao", Integer, ForeignKey("cidadao.id_usuario"), nullable=False)
+    id_usuario = Column("id_usuario", Integer, ForeignKey("usuario.id"), nullable=False)
     id_servico = Column("id_servico", Integer, ForeignKey("servico.id"), nullable=False)
     id_endereco = Column("id_endereco", Integer, ForeignKey("endereco.id"), nullable=False)
     id_agente_triagem = Column("id_agente_triagem", Integer, ForeignKey("funcionario.id_usuario"), default=None)
     id_agente_execucao = Column("id_agente_execucao", Integer, ForeignKey("funcionario.id_usuario"), default=None)
     id_agente_finalizado = Column("id_agente_finalizado", Integer, ForeignKey("funcionario.id_usuario"), default=None)
     
-    def __init__(self, titulo, descricao, id_cidadao, id_servico, id_endereco, urgencia=None, status="Em_Analise", data_fechamento=None, justificativa=None):
+    def __init__(self, titulo, descricao, id_usuario, id_servico, id_endereco, urgencia=None, status="Em_Analise", data_fechamento=None, justificativa=None):
         self.titulo = titulo
         self.descricao = descricao
         self.status = status
         self.urgencia = urgencia
         self.data_fechamento = data_fechamento
-        self.id_cidadao = id_cidadao
+        self.id_usuario = id_usuario
         self.id_servico = id_servico
         self.id_endereco = id_endereco
         self.justificativa = justificativa
@@ -204,4 +196,3 @@ class Servico(Base):
         self.descricao = descricao
         self.prazo_estimado_dias = prazo_estimado_dias
         self.ativo = ativo
-
