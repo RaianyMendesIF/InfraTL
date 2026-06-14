@@ -35,7 +35,7 @@ async def listar_minhas_ocorrencias(
     )
     
 @router_ocorrencia.patch("/{id_ocorrencia}/avaliar")
-async def avaliacao_ocorrencia(id_ocorrencia: int, dados: Avaliar_ocorrencia_schema, session: Session = Depends(pegar_sessao), id_admin: Usuario = Depends(get_current_admin)):
+async def avaliar_ocorrencia(id_ocorrencia: int, dados: Avaliar_ocorrencia_schema, session: Session = Depends(pegar_sessao), id_admin: Usuario = Depends(get_current_admin)):
     
     return OcorrenciaController.avaliar_ocorrencia(
         id_ocorrencia = id_ocorrencia,

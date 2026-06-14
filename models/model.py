@@ -15,9 +15,11 @@ class TipoUsuario(enum.Enum):
     Usuario = "Usuario"
     Admin = "Admin"
 
+
 class CargoFuncionario(enum.Enum):
     Agente = "Agente"
     Gestor = "Gestor"
+
 
 class Usuario(Base):
     __tablename__ = "usuario"
@@ -76,10 +78,7 @@ class Funcionario(Base):
         self.id_usuario = id_usuario
         self.matricula = matricula
         self.cargo = cargo
-    
-    
-    
-          
+
         
 class Endereco(Base):
     __tablename__ = "endereco"
@@ -105,8 +104,6 @@ class Endereco(Base):
         self.latitude = latitude
         self.longitude = longitude
         self.fonte_localizacao = fonte_localizacao
-        
-
 
 
 class Bairro(Base):
@@ -114,12 +111,11 @@ class Bairro(Base):
     
     id = Column("id", Integer, primary_key=True, autoincrement=True)
     nome = Column("nome", String, nullable=False)
+    regiao = Column('regiao', String, default=None)
     
-    def __init__(self, nome):
+    def __init__(self, nome, regiao=None):
         self.nome = nome
-   
-   
-   
+        self.regiao = regiao
         
 class Ocorrencia(Base):
     __tablename__ = "ocorrencia"

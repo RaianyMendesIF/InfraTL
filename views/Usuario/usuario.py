@@ -18,12 +18,12 @@ from fastapi.security import OAuth2PasswordRequestForm
 router_usuario = APIRouter(prefix="/auth", tags=["Autentificacao"])
 
 
-@router_usuario.post("/signup", status_code=status.HTTP_201_CREATED)
+@router_usuario.post("/cadastro", status_code=status.HTTP_201_CREATED)
 async def criar_conta(dados: Usuario_schema_cadastro, session: Session = Depends(pegar_sessao)):
     return cadastrar_usuario(dados=dados, session=session)
 
 @router_usuario.post("/login", response_model=Token_response)
-async def login(request: Request, dados: OAuth2PasswordRequestForm = Depends(), session: Session = Depends(pegar_sessao)):
+async def logar(request: Request, dados: OAuth2PasswordRequestForm = Depends(), session: Session = Depends(pegar_sessao)):
     return login_usuario(dados=dados, session=session, request=request)
 
 #envio de email para o usuario
@@ -31,7 +31,7 @@ async def login(request: Request, dados: OAuth2PasswordRequestForm = Depends(), 
 async def recuperar_senha(dados: Usuario_recuperar_senha, session: Session = Depends(pegar_sessao)):
     return solicitar_recuperar_senha(dados=dados, session=session)
 
-#
+
 @router_usuario.post("/redefinir-senha")
 async def redefinir_senha(dados: Usuario_redefinir_senha, session: Session = Depends(pegar_sessao), usuario_atual: Usuario = Depends(get_current_user)):
     return redefinir_senha_usuario(dados=dados, session=session, usuario_atual=usuario_atual)
