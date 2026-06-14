@@ -116,6 +116,7 @@ class Bairro(Base):
     def __init__(self, nome, regiao=None):
         self.nome = nome
         self.regiao = regiao
+     
         
 class Ocorrencia(Base):
     __tablename__ = "ocorrencia"

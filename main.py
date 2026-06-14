@@ -11,6 +11,7 @@ from views.Funcionario.funcionario import router_funcionario
 from views.Ocorrencia.triagem import router_triagem
 from views.Bairros.bairros import router_bairros
 from views.Servico.servico import router_servico
+from views.Usuario.cidadao import router_cidadao
 
 
 origins = [
@@ -37,6 +38,7 @@ app.include_router(router_funcionario)
 app.include_router(router_triagem) 
 app.include_router(router_bairros)
 app.include_router(router_servico)
+app.include_router(router_cidadao)
 
   
 if __name__ == "__main__":  
