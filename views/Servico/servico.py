@@ -20,7 +20,7 @@ async def listar_servicos(session: Session = Depends(pegar_sessao), admin: Usuar
 async def listar_servicos_ativos(session: Session = Depends(pegar_sessao), user: Usuario = Depends(get_current_user)):
     return await ServicosController.listar_servicos_ativos(session=session)
 
-@router_servico.post("/editar/{id}")
+@router_servico.put("/editar/{id}")
 async def editar_servico(id: int, dados: Servico_schema_editar, session: Session = Depends(pegar_sessao), admin: Usuario = Depends(get_current_admin)):
     return await ServicosController.editar_servicos(id=id, dados=dados, session=session)
         

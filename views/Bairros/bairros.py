@@ -17,6 +17,6 @@ async def listar_bairros(session: Session = Depends(pegar_sessao), user: Usuario
 async def cadastrar_bairro(dados: Bairro_schema_cadastro, session: Session = Depends(pegar_sessao), admin: Usuario = Depends(get_current_admin)):
     return await BairroController.cadastrar_bairro(dados=dados, session=session)
 
-@router_bairros.post("/editar/{id}")
+@router_bairros.put("/editar/{id}")
 async def editar_bairro(id: int, dados: Bairro_schema_editar, session: Session = Depends(pegar_sessao), admin: Usuario = Depends(get_current_admin)):
     return await BairroController.editar_bairro(id=id, dados=dados, session=session)
