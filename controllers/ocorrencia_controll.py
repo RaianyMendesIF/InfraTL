@@ -67,7 +67,6 @@ class OcorrenciaController:
                 id_usuario=dados.id_usuario,
                 id_servico=dados.id_servico,
                 id_endereco=endereco.id,
-                urgencia=dados.urgencia,
             )
 
             session.add(ocorrencia)
@@ -110,12 +109,13 @@ class OcorrenciaController:
         if dados.aprovado:
             ocorrencia.status = "Pendente"
             ocorrencia.justificativa = None
+            ocorrencia.urgencia = dados.urgencia
         else:
             if not dados.justificativa:
                 raise HTTPException(status_code=400, detail="Necessario passar uma justificativa para o arquivamento da ocorrencia")
             ocorrencia.status = "Arquivado"
             ocorrencia.justificativa = dados.justificativa
-            
+            ocorrencia.urgencia = None
         ocorrencia.id_agente_triagem = id_agente
         
         session.commit()

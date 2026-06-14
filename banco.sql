@@ -199,7 +199,6 @@ CREATE TABLE ocorrencia (
 
     -- Rastreamento de quem tocou na ocorrência (RF06, RF07)
 
-    id_agente_analise    INT                DEFAULT NULL REFERENCES funcionario (id_usuario),
     id_agente_triagem    INT                DEFAULT NULL REFERENCES funcionario (id_usuario),
     id_agente_execucao   INT                DEFAULT NULL REFERENCES funcionario (id_usuario),
     id_agente_finalizado INT                DEFAULT NULL REFERENCES funcionario (id_usuario),
@@ -477,13 +476,30 @@ CREATE TRIGGER trg_validar_transicao_status
 -- O FastAPI não precisa fazer isso manualmente — o banco garante.
 CREATE OR REPLACE FUNCTION fn_registrar_historico()
 RETURNS TRIGGER LANGUAGE plpgsql AS $$
+DECLARE
+    v_usuario_alterou INT;
 BEGIN
+    -- Só age se for uma atualização e se o status realmente mudou
     IF NEW.status <> OLD.status THEN
+        
+        -- Identifica qual agente foi o responsável por esta mudança de fase
+        v_usuario_alterou := CASE 
+            WHEN NEW.id_agente_finalizado IS DISTINCT FROM OLD.id_agente_finalizado THEN NEW.id_agente_finalizado
+            WHEN NEW.id_agente_execucao   IS DISTINCT FROM OLD.id_agente_execucao   THEN NEW.id_agente_execucao
+            WHEN NEW.id_agente_triagem    IS DISTINCT FROM OLD.id_agente_triagem    THEN NEW.id_agente_triagem
+            ELSE COALESCE(NEW.id_agente_finalizado, NEW.id_agente_execucao, NEW.id_agente_triagem, NEW.id_usuario)
+        END;
+
+        -- Registra o movimento no histórico imutável
         INSERT INTO historico_ocorrencia
-            (id_ocorrencia, status_anterior, status_novo, mensagem)
+            (id_ocorrencia, status_anterior, status_novo, mensagem, alterado_por)
         VALUES
-            (NEW.id, OLD.status, NEW.status,
-             'Status alterado de ' || OLD.status || ' para ' || NEW.status);
+            (NEW.id, 
+             OLD.status, 
+             NEW.status,
+             'Status alterado de ' || OLD.status || ' para ' || NEW.status, 
+             v_usuario_alterou);
+             
     END IF;
     RETURN NEW;
 END;

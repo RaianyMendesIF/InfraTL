@@ -9,7 +9,7 @@ class Ocorrencia_schema_cadastro(BaseModel):
     id_usuario: int
     id_servico: int
     endereco: Endereco_schema_cadastro
-    urgencia: Optional[Literal["Baixa", "Media", "Alta", "Critica"]] = None
+    
 
 class Ocorrencia_schema_resposta(BaseModel):
     id: int
@@ -27,3 +27,4 @@ class Ocorrencia_schema_resposta(BaseModel):
 class Avaliar_ocorrencia_schema(BaseModel):
     aprovado: bool
     justificativa: Optional[str] = None
+    urgencia: Optional[Literal["Baixa", "Media", "Alta", "Critica"]] = None
