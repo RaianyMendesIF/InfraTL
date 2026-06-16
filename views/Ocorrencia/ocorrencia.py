@@ -46,7 +46,7 @@ async def avaliar_ocorrencia(id_ocorrencia: int, dados: Avaliar_ocorrencia_schem
         background_tasks=background_tasks    
     )
     
-@router_ocorrencia.patch("/ocorrencias/{id_ocorrencia}/status", response_model=Ocorrencia_schema_resposta)
+@router_ocorrencia.patch("/{id_ocorrencia}/status", response_model=Ocorrencia_schema_resposta)
 def rota_atualizar_status_tecnico(id_ocorrencia: int, dados: Mudar_status_ocorrencia_schema, background_tasks: BackgroundTasks, session: Session = Depends(pegar_sessao), agente_atual: Usuario = Depends(get_current_admin)):
     return OcorrenciaController.atualizar_status_ocorrencia(
         id_ocorrencia=id_ocorrencia,
