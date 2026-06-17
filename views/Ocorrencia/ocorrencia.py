@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from database import pegar_sessao
 from sqlalchemy.orm import Session
 from sqlalchemy import text
@@ -8,8 +8,8 @@ from schemas.ocorrencia_schemas import (
     Ocorrencia_schema_resposta,
     Ocorrencia_schema_cadastro,
     Avaliar_ocorrencia_schema,
-    Ocorrencia_schema_listar
-    
+    Ocorrencia_schema_listar,
+    Mudar_status_ocorrencia_schema
 )
 from controllers.ocorrencia_controll import OcorrenciaController
 from utils.security import get_current_user, get_current_admin
@@ -36,13 +36,24 @@ async def listar_minhas_ocorrencias(
     )
     
 @router_ocorrencia.patch("/{id_ocorrencia}/avaliar")
-async def avaliar_ocorrencia(id_ocorrencia: int, dados: Avaliar_ocorrencia_schema, session: Session = Depends(pegar_sessao), id_admin: Usuario = Depends(get_current_admin)):
+async def avaliar_ocorrencia(id_ocorrencia: int, dados: Avaliar_ocorrencia_schema, background_tasks: BackgroundTasks, session: Session = Depends(pegar_sessao), id_admin: Usuario = Depends(get_current_admin)):
     
     return OcorrenciaController.avaliar_ocorrencia(
         id_ocorrencia = id_ocorrencia,
         dados = dados,
         session = session,
-        id_agente = id_admin.id
+        id_agente = id_admin.id,
+        background_tasks=background_tasks    
+    )
+    
+@router_ocorrencia.patch("/{id_ocorrencia}/status", response_model=Ocorrencia_schema_resposta)
+def rota_atualizar_status_tecnico(id_ocorrencia: int, dados: Mudar_status_ocorrencia_schema, background_tasks: BackgroundTasks, session: Session = Depends(pegar_sessao), agente_atual: Usuario = Depends(get_current_admin)):
+    return OcorrenciaController.atualizar_status_ocorrencia(
+        id_ocorrencia=id_ocorrencia,
+        novo_status=dados.status,
+        id_agente=agente_atual.id,
+        session=session,
+        background_tasks=background_tasks
     )
 
 @router_ocorrencia.get("/listar") 

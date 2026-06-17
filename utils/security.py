@@ -8,14 +8,18 @@ from models.model import Usuario
 from passlib.context import CryptContext
 import smtplib
 from email.message import EmailMessage
+import os
+from dotenv import load_dotenv
 
+
+load_dotenv()
 
 # Em produção, coloque isso no seu arquivo .env!
 SECRET_KEY = "chave_super_secreta_infratl"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
-EMAIL_REMETENTE = "naoresponder.infratl@gmail.com"
-EMAIL_SENHA_APP = "onns cjps tano eglk"
+EMAIL_REMETENTE = os.getenv("EMAIL_REMETENTE_env")
+EMAIL_SENHA_APP = os.getenv("EMAIL_SENHA_APP_env")
 URL_FRONTEND_RECUPERACAO = "link do front"
 
 
@@ -108,6 +112,36 @@ def enviar_email_recuperacao(email_destino: str, link_recuperacao: str):
     Se você não solicitou isso, por favor ignore este e-mail.
     """
     msg.set_content(conteudo)
+    
+    try:
+        # Conecta no servidor SMTP do Gmail na porta 587 (padrão de segurança)
+        with smtplib.SMTP('smtp.gmail.com', 587) as servidor:
+            servidor.starttls() # Inicia a criptografia da conexão
+            servidor.login(EMAIL_REMETENTE, EMAIL_SENHA_APP) # Faz o login
+            servidor.send_message(msg) # Dispara a carta
+            print(f"E-mail enviado com sucesso para {email_destino}")
+    except Exception as e:
+        print(f"Erro ao enviar e-mail: {e}")
+
+
+def enviar_email_notificacao_ocorrencia(
+    email_destino: str,
+    id_ocorrencia: int,
+    titulo: str,
+    status_anterior: str,
+    status_novo: str,
+):
+    msg = EmailMessage()
+    msg["Subject"] = f"Infra TL: atualização na ocorrência #{id_ocorrencia}"
+    msg["From"] = EMAIL_REMETENTE
+    msg["To"] = email_destino
+    msg.set_content(
+        f"Olá!\n\n"
+        f"A ocorrência \"{titulo}\" (#{id_ocorrencia}) "
+        f"foi atualizada de {status_anterior.replace('_', ' ')} "
+        f"para {status_novo.replace('_', ' ')}.\n\n"
+        "Acesse o sistema para mais detalhes.\n"
+    )
     
     try:
         # Conecta no servidor SMTP do Gmail na porta 587 (padrão de segurança)

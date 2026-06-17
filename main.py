@@ -6,7 +6,7 @@ from database import engine
 
 
 from views.Usuario.usuario import router_usuario
-from views.Ocorrencia.ocorrencia import router_ocorrencia
+from views.ocorrencia.ocorrencia import router_ocorrencia
 from views.Funcionario.funcionario import router_funcionario
 from views.Bairros.bairros import router_bairros
 from views.Servico.servico import router_servico

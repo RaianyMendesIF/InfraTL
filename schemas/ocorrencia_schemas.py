@@ -35,3 +35,7 @@ class Ocorrencia_schema_listar(BaseModel):
     tipo: Optional[str] = None
     status: Optional[str] = None
     model_config = ConfigDict(from_attributes=True)
+    
+class Mudar_status_ocorrencia_schema(BaseModel):
+    status: Literal["Em_Execucao", "Finalizado"]
+    observacao_tecnica: Optional[str] = None
