@@ -198,8 +198,7 @@ class OcorrenciaController:
                 status_code=500, 
                 detail=f"Erro interno ao atualizar para Em Execução: {str(e)}"
             )
-            
-    
+               
     @staticmethod
     async def listar_ocorrencias(session: Session, bairro: str = None, tipo: str = None, status: str = None):
         try:

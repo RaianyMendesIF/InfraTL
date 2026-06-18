@@ -25,7 +25,7 @@ URL_FRONTEND_RECUPERACAO = "link do front"
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/conectar")
 
 def criar_token_jwt(data: dict):
     to_encode = data.copy()
