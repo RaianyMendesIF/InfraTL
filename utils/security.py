@@ -11,7 +11,6 @@ from email.message import EmailMessage
 import os
 from dotenv import load_dotenv
 
-
 load_dotenv()
 
 # Em produção, coloque isso no seu arquivo .env!
@@ -27,6 +26,7 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/conectar")
 
+
 def criar_token_jwt(data: dict):
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -37,23 +37,26 @@ def criar_token_jwt(data: dict):
 def token_recuperar_senha(email: str):
     expire = datetime.now(timezone.utc) + timedelta(minutes=15)
     dados = {"sub": email, "tipo": "reset", "exp": expire}
-    
+
     return jwt.encode(dados, SECRET_KEY, algorithm=ALGORITHM)
 
 
 def decodificar_token_recuperacao(token: str):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
-        
+
         if payload.get("tipo") != "reset":
             raise ValueError("Este link não é válido para redefinir senhas.")
-        return payload.get("sub") # Retorna o e-mail que estava dentro do token
-    
+        return payload.get("sub")  # Retorna o e-mail que estava dentro do token
+
     except jwt.ExpiredSignatureError:
-        raise ValueError("O link de recuperação expirou (limite de 15 minutos). Por favor, solicite um novo lá na tela de login.")
-    
+        raise ValueError(
+            "O link de recuperação expirou (limite de 15 minutos). Por favor, solicite um novo lá na tela de login."
+        )
+
     except jwt.InvalidTokenError:
         raise ValueError("O link de recuperação está corrompido ou é inválido.")
+
 
 def get_current_user(
     token: str = Depends(oauth2_scheme), session: Session = Depends(pegar_sessao)
@@ -66,8 +69,8 @@ def get_current_user(
 
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        usuario_id: str = payload.get("sub")
-        if usuario_id is None:
+        usuario_id = payload.get("sub")
+        if not usuario_id:
             raise credenciais_exception
     except jwt.ExpiredSignatureError:
         raise HTTPException(
@@ -95,12 +98,12 @@ def get_current_admin(current_user: Usuario = Depends(get_current_user)):
 
 
 def enviar_email_recuperacao(email_destino: str, link_recuperacao: str):
-    
+
     msg = EmailMessage()
-    msg['Subject'] = 'Recuperação de Senha - InfraTL'
-    msg['From'] = EMAIL_REMETENTE
-    msg['To'] = email_destino
-    
+    msg["Subject"] = "Recuperação de Senha - InfraTL"
+    msg["From"] = EMAIL_REMETENTE
+    msg["To"] = email_destino
+
     conteudo = f"""
     Olá!
     
@@ -112,13 +115,13 @@ def enviar_email_recuperacao(email_destino: str, link_recuperacao: str):
     Se você não solicitou isso, por favor ignore este e-mail.
     """
     msg.set_content(conteudo)
-    
+
     try:
         # Conecta no servidor SMTP do Gmail na porta 587 (padrão de segurança)
-        with smtplib.SMTP('smtp.gmail.com', 587) as servidor:
-            servidor.starttls() # Inicia a criptografia da conexão
-            servidor.login(EMAIL_REMETENTE, EMAIL_SENHA_APP) # Faz o login
-            servidor.send_message(msg) # Dispara a carta
+        with smtplib.SMTP("smtp.gmail.com", 587) as servidor:
+            servidor.starttls()  # Inicia a criptografia da conexão
+            servidor.login(EMAIL_REMETENTE, EMAIL_SENHA_APP)  # Faz o login
+            servidor.send_message(msg)  # Dispara a carta
             print(f"E-mail enviado com sucesso para {email_destino}")
     except Exception as e:
         print(f"Erro ao enviar e-mail: {e}")
@@ -137,18 +140,18 @@ def enviar_email_notificacao_ocorrencia(
     msg["To"] = email_destino
     msg.set_content(
         f"Olá!\n\n"
-        f"A ocorrência \"{titulo}\" (#{id_ocorrencia}) "
+        f'A ocorrência "{titulo}" (#{id_ocorrencia}) '
         f"foi atualizada de {status_anterior.replace('_', ' ')} "
         f"para {status_novo.replace('_', ' ')}.\n\n"
         "Acesse o sistema para mais detalhes.\n"
     )
-    
+
     try:
         # Conecta no servidor SMTP do Gmail na porta 587 (padrão de segurança)
-        with smtplib.SMTP('smtp.gmail.com', 587) as servidor:
-            servidor.starttls() # Inicia a criptografia da conexão
-            servidor.login(EMAIL_REMETENTE, EMAIL_SENHA_APP) # Faz o login
-            servidor.send_message(msg) # Dispara a carta
+        with smtplib.SMTP("smtp.gmail.com", 587) as servidor:
+            servidor.starttls()  # Inicia a criptografia da conexão
+            servidor.login(EMAIL_REMETENTE, EMAIL_SENHA_APP)  # Faz o login
+            servidor.send_message(msg)  # Dispara a carta
             print(f"E-mail enviado com sucesso para {email_destino}")
     except Exception as e:
         print(f"Erro ao enviar e-mail: {e}")
