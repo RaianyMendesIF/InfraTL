@@ -28,6 +28,13 @@ O InfraTL é composto por:
 
 ---
 
+## Importante para cadastrar
+
+- Temos alguns bairros pre-definidos, utilize o bairro "Centro" para realizar o cadastro.
+- "fonte_localizacao": deixe como "manual"
+
+---
+
 ## Tecnologias
 
 | Camada | Tecnologia |
