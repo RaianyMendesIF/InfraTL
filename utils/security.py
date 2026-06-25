@@ -14,8 +14,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Em produção, coloque isso no seu arquivo .env!
-SECRET_KEY = "chave_super_secreta_infratl"
-ALGORITHM = "HS256"
+SECRET_KEY = os.getenv("SECRET_KEY_env")
+ALGORITHM = os.getenv("ALGORITHM_env")
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 EMAIL_REMETENTE = os.getenv("EMAIL_REMETENTE_env")
 EMAIL_SENHA_APP = os.getenv("EMAIL_SENHA_APP_env")
