@@ -1,338 +1,393 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  LayoutDashboard, AlertTriangle, ClipboardList, BarChart3, Settings, 
-  LogOut, Search, SlidersHorizontal, Bell, User, Users, Shield, Palette, Database, Camera
+import {
+  Bell, User, Users, Shield, Palette, Monitor, Camera, Search,
+  Sun, Moon, Laptop, Smartphone, ChevronRight, Check,
 } from 'lucide-react';
+import Sidebar from './Sidebar';
+import Header from './Header';
+import { API, getUsuarioLogado, isFuncionario } from '../api';
+
+const Toggle = ({ label, description, checked, onChange }) => (
+  <div className="flex items-center justify-between py-3">
+    <div>
+      <p className="text-sm font-medium text-slate-800">{label}</p>
+      {description && <p className="text-xs text-slate-500">{description}</p>}
+    </div>
+    <button
+      type="button"
+      onClick={onChange}
+      className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 outline-none ${checked ? 'bg-blue-600' : 'bg-slate-200'}`}
+    >
+      <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition duration-200 ${checked ? 'translate-x-5' : 'translate-x-0'}`} />
+    </button>
+  </div>
+);
 
 export default function Configuracoes({ onLogout, onNavigate }) {
-  const [activeTab, setActiveTab] = useState('perfil');
-  const [usuario, setUsuario] = useState({ nome: 'Carregando...', email: '', cargo: 'Cidadão' });
+  const funcionario = isFuncionario();
+  const usuarioToken = getUsuarioLogado();
 
-  // Estados para a tela de Gestão de Equipe
-  const [idAdicionar, setIdAdicionar] = useState('');
-  const [matricula, setMatricula] = useState('');
-  const [cargo, setCargo] = useState('Agente');
-  const [idRemover, setIdRemover] = useState('');
+  const [activeTab, setActiveTab] = useState('Perfil');
+  const [isLoading, setIsLoading] = useState(false);
+  const [erroSenha, setErroSenha] = useState('');
+  const [sucessoSenha, setSucessoSenha] = useState('');
 
-  // Tenta puxar os dados reais do usuário logado decodificando o token (Igual ao Dashboard)
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      try {
-        const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
-        // Adiciona o padding para evitar erro de Base64
-        let base64Padded = base64;
-        while (base64Padded.length % 4) {
-            base64Padded += '=';
-        }
-        
-        const payload = JSON.parse(window.atob(base64Padded));
-        
-        let nomeFinal = payload.nome;
-        if (!nomeFinal) {
-           nomeFinal = isNaN(payload.sub) ? payload.sub : `Usuário #${payload.sub}`;
-        }
+  const [perfilForm, setPerfilForm] = useState({
+    nome: usuarioToken?.nome || '',
+    telefone: '',
+  });
 
-        setUsuario({ 
-          nome: String(nomeFinal),
-          email: payload.email || 'Email não informado',
-          cargo: payload.tipo_usuario || payload.cargo || 'Cidadão' 
-        });
-      } catch (e) {
-        // Fallback
-      }
+  const [addEquipeForm, setAddEquipeForm] = useState({ id_usuario: '', matricula: '', cargo: 'Agente' });
+  const [removerEquipeId, setRemoverEquipeId] = useState('');
+
+  const [senhaForm, setSenhaForm] = useState({ nova: '', confirmar: '' });
+
+  const [notifs, setNotifs] = useState({
+    emailNovaOcorrencia: true, emailStatus: true, emailRelatorio: false,
+    pushNovas: true, pushOS: true, pushPrazo: true, pushAtualizacoes: false,
+  });
+
+  const [tema, setTema] = useState('Claro');
+  const [densidade, setDensidade] = useState('Normal');
+
+  const handleMudarTema = (novoTema) => {
+    setTema(novoTema);
+    if (novoTema === 'Escuro') {
+      document.documentElement.classList.add('dark');
+    } else if (novoTema === 'Claro') {
+      document.documentElement.classList.remove('dark');
+    } else {
+      window.matchMedia('(prefers-color-scheme: dark)').matches
+        ? document.documentElement.classList.add('dark')
+        : document.documentElement.classList.remove('dark');
     }
-  }, []);
+  };
 
-  const handlePromover = async (e) => {
+  // Alterar senha via API real
+  const handleAtualizarSenha = async (e) => {
     e.preventDefault();
-    const token = localStorage.getItem('token');
-    
+    setErroSenha('');
+    setSucessoSenha('');
+    if (senhaForm.nova !== senhaForm.confirmar) {
+      setErroSenha('As senhas não coincidem.');
+      return;
+    }
+    setIsLoading(true);
     try {
-      const response = await fetch('http://127.0.0.1:8000/funcionario/adicionar', {
+      const res = await API.redefinirSenha(senhaForm.nova, senhaForm.confirmar, /* usa token da sessão */ null);
+      // redefinirSenha com token null usa get_current_user via header Authorization normal
+      // Chamamos via apiFetch direto:
+      const response = await (await import('../api')).apiFetch('/auth/redefinir_senha', {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          id_usuario: parseInt(idAdicionar),
-          matricula: matricula,
-          cargo: cargo
-        })
+        body: JSON.stringify({ nova_senha: senhaForm.nova, confirmar_senha: senhaForm.confirmar }),
       });
-      const data = await response.json();
-      if(response.ok) alert(data.mensagem || 'Funcionário promovido com sucesso!');
-      else alert('Erro: ' + data.detail);
-    } catch (error) {
-      alert('Erro de conexão.');
+      if (response.ok) {
+        setSucessoSenha('Senha atualizada com sucesso!');
+        setSenhaForm({ nova: '', confirmar: '' });
+      } else {
+        const err = await response.json();
+        setErroSenha(err.detail || 'Erro ao atualizar senha.');
+      }
+    } catch {
+      setErroSenha('Não foi possível conectar ao servidor.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleRemover = async (e) => {
+  const handlePromoverFuncionario = async (e) => {
     e.preventDefault();
-    const token = localStorage.getItem('token');
-    
+    setIsLoading(true);
     try {
-      const response = await fetch('http://127.0.0.1:8000/funcionario/remover', {
-        method: 'DELETE',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ id_usuario: parseInt(idRemover) })
+      const res = await API.adicionarFuncionario({
+        id_usuario: parseInt(addEquipeForm.id_usuario),
+        matricula: addEquipeForm.matricula,
+        cargo: addEquipeForm.cargo,
       });
-      const data = await response.json();
-      if(response.ok) alert(data.mensagem || 'Privilégios removidos com sucesso!');
-      else alert('Erro: ' + data.detail);
-    } catch (error) {
-      alert('Erro de conexão.');
-    }
+      if (res.ok) {
+        alert('Usuário promovido a funcionário com sucesso!');
+        setAddEquipeForm({ id_usuario: '', matricula: '', cargo: 'Agente' });
+      } else {
+        const err = await res.json();
+        alert(`Erro: ${err.detail}`);
+      }
+    } catch { alert('Erro de conexão.'); }
+    finally { setIsLoading(false); }
   };
+
+  const handleRemoverPrivilegios = async (e) => {
+    e.preventDefault();
+    if (!confirm('Tem certeza que deseja remover os privilégios deste funcionário?')) return;
+    setIsLoading(true);
+    try {
+      const res = await API.removerFuncionario(parseInt(removerEquipeId));
+      if (res.ok) {
+        alert('Privilégios removidos com sucesso!');
+        setRemoverEquipeId('');
+      } else {
+        const err = await res.json();
+        alert(`Erro: ${err.detail}`);
+      }
+    } catch { alert('Erro de conexão.'); }
+    finally { setIsLoading(false); }
+  };
+
+  const tipo = usuarioToken?.tipo === 'Admin' ? 'Funcionário' : 'Cidadão';
 
   return (
     <div className="flex h-screen bg-slate-50 font-sans">
-      
-      {/* SIDEBAR (Menu Lateral) */}
-      <aside className="w-64 bg-[#1e293b] text-slate-300 flex flex-col shrink-0">
-        <div className="p-6 flex items-center gap-3">
-          <div className="bg-white p-1 rounded">
-            <BarChart3 className="text-green-600 w-6 h-6" /> 
+      <Sidebar onNavigate={onNavigate} onLogout={onLogout} paginaAtiva="configuracoes" />
+
+      <main className="flex-1 flex flex-col overflow-hidden bg-white">
+        <Header>
+          <div className="relative max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input type="text" placeholder="Buscar configurações..."
+              className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-blue-500 outline-none" />
           </div>
-          <div>
-            <h1 className="text-white font-bold text-lg leading-tight">InfraTL</h1>
-            <p className="text-xs text-slate-400">Zeladoria Urbana</p>
-          </div>
-        </div>
+        </Header>
 
-        <nav className="flex-1 px-4 space-y-2 mt-4 overflow-y-auto">
-          <button onClick={() => onNavigate('dashboard')} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-800 rounded-lg transition-colors text-left">
-            <LayoutDashboard className="w-5 h-5" /> Visao Geral
-          </button>
-          <button onClick={() => onNavigate('ocorrencias')} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-800 rounded-lg transition-colors text-left">
-            <AlertTriangle className="w-5 h-5" /> Ocorrencias
-          </button>
-          <button className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-800 rounded-lg transition-colors text-left">
-            <ClipboardList className="w-5 h-5" /> Ordens de Servico
-          </button>
-          <button className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-800 rounded-lg transition-colors text-left">
-            <BarChart3 className="w-5 h-5" /> Relatorios
-          </button>
-          <button className="w-full flex items-center gap-3 bg-blue-600 text-white px-4 py-3 rounded-lg font-medium text-left">
-            <Settings className="w-5 h-5" /> Configuracoes
-          </button>
-        </nav>
-
-        <div className="p-4 border-t border-slate-700">
-          <button onClick={onLogout} className="flex items-center gap-3 px-4 py-2 w-full text-left hover:text-white transition-colors">
-            <LogOut className="w-5 h-5" /> Sair
-          </button>
-        </div>
-      </aside>
-
-      {/* ÁREA PRINCIPAL */}
-      <main className="flex-1 flex flex-col overflow-hidden">
-        
-        {/* HEADER */}
-        <header className="bg-white border-b border-slate-200 h-16 flex items-center justify-between px-4 lg:px-8 shrink-0">
-          <div className="flex gap-4 flex-1 max-w-2xl mr-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <input type="text" placeholder="Buscar ocorrencias, enderecos, categorias..." 
-                className="w-full pl-10 pr-4 py-2 bg-slate-100 border-transparent rounded-lg text-sm focus:bg-white focus:border-blue-500 outline-none transition-all" />
-            </div>
-            <button className="hidden sm:flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 text-sm font-medium">
-              <SlidersHorizontal className="w-4 h-4" /> Filtros
-            </button>
+        <div className="flex-1 overflow-hidden flex flex-col">
+          <div className="pt-8 px-8 pb-4 shrink-0">
+            <h2 className="text-2xl font-bold text-slate-800">Configurações</h2>
+            <p className="text-slate-500 text-sm">Gerencie suas preferências e configurações do sistema</p>
           </div>
 
-          <div className="flex items-center gap-4 lg:gap-6 shrink-0">
-            <button className="relative text-slate-500 hover:text-slate-700">
-              <Bell className="w-5 h-5" />
-            </button>
-            <div className="flex items-center gap-3 border-l border-slate-200 pl-4 lg:pl-6">
-              <div className="text-right hidden sm:block">
-                <p className="text-sm font-semibold text-slate-700">{usuario.nome}</p>
-                {/* Agora exibe o cargo real do usuário em vez de um texto fixo */}
-                <p className="text-xs text-slate-500">{usuario.cargo}</p>
-              </div>
-              <div className="w-10 h-10 shrink-0 rounded-full bg-teal-600 text-white flex items-center justify-center font-bold">
-                {String(usuario.nome || 'US').substring(0, 2).toUpperCase()}
-              </div>
-            </div>
-          </div>
-        </header>
-
-        {/* CONTEÚDO SCROLLÁVEL DAS CONFIGURAÇÕES */}
-        <div className="flex-1 overflow-auto p-8">
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold text-slate-800">Configuracoes</h2>
-            <p className="text-slate-500 text-sm">Gerencie suas preferencias e configuracoes do sistema</p>
-          </div>
-
-          <div className="flex flex-col md:flex-row gap-8">
-            
-            {/* SUB-MENU ESQUERDO */}
-            <div className="w-full md:w-64 shrink-0 bg-white border border-slate-200 rounded-xl p-2 h-fit">
-            <nav className="flex flex-col gap-1 text-sm font-medium">
-                <button 
-                  onClick={() => setActiveTab('perfil')}
-                  className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors ${activeTab === 'perfil' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50'}`}
-                >
-                  <User className="w-4 h-4" /> Perfil
-                </button>
-
-                {/* Só mostra a aba se o cargo do usuário incluir "Gestor" ou "Admin" */}
-                {(usuario.cargo?.includes('Gestor') || usuario.cargo?.includes('Admin')) && (
-                <button 
-                  onClick={() => setActiveTab('equipe')}
-                  className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors ${activeTab === 'equipe' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50'}`}
-                >
-                  <Users className="w-4 h-4" /> Gestao de Equipe
-                </button>
-                )}
-
-                <button className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors">
-                  <Bell className="w-4 h-4" /> Notificacoes
-                </button>
-                <button className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors">
-                  <Shield className="w-4 h-4" /> Seguranca
-                </button>
-                <button className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors">
-                  <Palette className="w-4 h-4" /> Aparencia
-                </button>
-                <button className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors">
-                  <Database className="w-4 h-4" /> Sistema
-                </button>
+          <div className="flex-1 flex overflow-hidden">
+            {/* Submenu lateral */}
+            <div className="w-60 p-6 pt-4 overflow-y-auto shrink-0 border-r border-slate-100">
+              <nav className="space-y-1">
+                {[
+                  { key: 'Perfil', Icon: User, label: 'Perfil' },
+                  // Gestão de Equipe só para Admin (funcionário)
+                  ...(funcionario ? [{ key: 'Equipe', Icon: Users, label: 'Gestão de Equipe' }] : []),
+                  { key: 'Notificacoes', Icon: Bell, label: 'Notificações' },
+                  { key: 'Seguranca', Icon: Shield, label: 'Segurança' },
+                  { key: 'Aparencia', Icon: Palette, label: 'Aparência' },
+                  { key: 'Sistema', Icon: Monitor, label: 'Sistema' },
+                ].map(({ key, Icon, label }) => (
+                  <button
+                    key={key}
+                    onClick={() => setActiveTab(key)}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors outline-none text-left ${activeTab === key ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50'}`}
+                  >
+                    <Icon className="w-4 h-4" /> {label}
+                  </button>
+                ))}
               </nav>
             </div>
 
-            {/* PAINEL DIREITO */}
-            <div className="flex-1 bg-white border border-slate-200 rounded-xl p-8">
-              
-              {activeTab === 'perfil' && (
-                <>
-                  <div className="flex items-center gap-6 mb-8">
+            {/* Área de conteúdo */}
+            <div className="flex-1 p-8 pt-4 overflow-y-auto bg-slate-50/50">
+
+              {/* ── Perfil ── */}
+              {activeTab === 'Perfil' && (
+                <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-sm max-w-2xl">
+                  <div className="flex items-center gap-5 mb-8">
                     <div className="relative">
                       <div className="w-20 h-20 rounded-full bg-teal-500 text-white flex items-center justify-center text-3xl font-bold">
-                        {String(usuario.nome || 'US').substring(0, 2).toUpperCase()}
+                        {(usuarioToken?.nome || 'US').substring(0, 2).toUpperCase()}
                       </div>
-                      <button className="absolute bottom-0 right-0 p-1.5 bg-white border border-slate-200 rounded-full text-slate-600 hover:bg-slate-50">
-                        <Camera className="w-4 h-4" />
-                      </button>
                     </div>
                     <div>
-                      <h3 className="text-xl font-bold text-slate-800">{usuario.nome}</h3>
-                      <p className="text-slate-500 text-sm mb-1">{usuario.cargo}</p>
-                      <button className="text-blue-600 text-sm font-medium hover:underline">Alterar foto</button>
+                      <h3 className="text-xl font-bold text-slate-800">{usuarioToken?.nome}</h3>
+                      <p className="text-slate-500 text-sm">{tipo}</p>
                     </div>
                   </div>
 
-                  <form className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      
-                      {/* Campos editáveis */}
+                  <form onSubmit={(e) => { e.preventDefault(); alert('Perfil atualizado! (simulação)'); }} className="space-y-5">
+                    <div className="grid grid-cols-2 gap-5">
                       <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Nome completo</label>
-                        <input type="text" defaultValue={usuario.nome} className="w-full px-4 py-2 border border-slate-300 rounded-lg text-slate-700" />
+                        <input type="text" value={perfilForm.nome} onChange={(e) => setPerfilForm({ ...perfilForm, nome: e.target.value })}
+                          className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:border-blue-500 outline-none" />
                       </div>
-                      
                       <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Telefone</label>
-                        <input type="text" defaultValue="(67) 99999-0000" className="w-full px-4 py-2 border border-slate-300 rounded-lg text-slate-700" />
-                      </div>
-
-                      {/* Campos Bloqueados (disabled) */}
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-2">
-                          E-mail institucional <Shield className="w-3 h-3 text-slate-400" />
-                        </label>
-                        <input 
-                          type="email" 
-                          defaultValue={usuario.email || "Email restrito"} 
-                          disabled 
-                          className="w-full px-4 py-2 bg-slate-100 border border-slate-200 rounded-lg text-slate-500 cursor-not-allowed outline-none" 
-                        />
-                      </div>
-                      
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-2">
-                          Secretaria <Shield className="w-3 h-3 text-slate-400" />
-                        </label>
-                        <input 
-                          type="text" 
-                          defaultValue="Administracao" 
-                          disabled 
-                          className="w-full px-4 py-2 bg-slate-100 border border-slate-200 rounded-lg text-slate-500 cursor-not-allowed outline-none" 
-                        />
+                        <input type="text" value={perfilForm.telefone} onChange={(e) => setPerfilForm({ ...perfilForm, telefone: e.target.value })}
+                          placeholder="(67) 99999-9999"
+                          className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:border-blue-500 outline-none" />
                       </div>
                     </div>
-                    
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-2">
-                        Cargo e Privilégios <Shield className="w-3 h-3 text-slate-400" />
-                      </label>
-                      <input 
-                        type="text" 
-                        defaultValue={usuario.cargo} 
-                        disabled 
-                        className="w-full px-4 py-2 bg-slate-100 border border-slate-200 rounded-lg text-slate-500 cursor-not-allowed outline-none" 
-                      />
-                      <p className="text-xs text-slate-400 mt-2">Alterações de e-mail institucional, cargo ou secretaria devem ser solicitadas à Gestão de Equipe.</p>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Tipo de conta 🔒</label>
+                      <input type="text" value={tipo} disabled
+                        className="w-full px-4 py-2 border border-slate-200 bg-slate-50 rounded-lg text-slate-500 cursor-not-allowed outline-none" />
+                      <p className="text-xs text-slate-400 mt-1">Alterações de cargo devem ser feitas pela Gestão de Equipe.</p>
                     </div>
-
-                    <div className="flex justify-end pt-4">
-                      <button type="button" className="bg-blue-600 text-white font-medium px-6 py-2.5 rounded-lg hover:bg-blue-700 transition-colors">
-                        Salvar Alteracoes
+                    <div className="flex justify-end">
+                      <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg font-medium transition-colors outline-none">
+                        Salvar alterações
                       </button>
                     </div>
                   </form>
-                </>
+                </div>
               )}
 
-              {activeTab === 'equipe' && (
-                <div className="space-y-8">
-                  <div>
-                    <h3 className="text-lg font-bold text-slate-800 mb-1">Adicionar Funcionario</h3>
-                    <p className="text-sm text-slate-500 mb-4">Promova um usuario comum (cidadao) para ter privilegios de sistema.</p>
-                    <form onSubmit={handlePromover} className="bg-slate-50 p-6 rounded-lg border border-slate-200">
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+              {/* ── Gestão de Equipe (Admin) ── */}
+              {activeTab === 'Equipe' && funcionario && (
+                <div className="max-w-2xl space-y-6">
+                  <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-sm">
+                    <h3 className="text-lg font-bold text-slate-800 mb-1">Adicionar Funcionário</h3>
+                    <p className="text-sm text-slate-500 mb-6">Promova um cidadão para ter privilégios de sistema.</p>
+                    <form onSubmit={handlePromoverFuncionario} className="space-y-4">
+                      <div className="grid grid-cols-3 gap-4">
                         <div>
                           <label className="block text-sm font-medium text-slate-700 mb-1">ID do Usuário</label>
-                          <input type="number" value={idAdicionar} onChange={e => setIdAdicionar(e.target.value)} placeholder="Ex: 15" className="w-full px-4 py-2 border border-slate-300 rounded-lg" required />
+                          <input type="number" required value={addEquipeForm.id_usuario}
+                            onChange={(e) => setAddEquipeForm({ ...addEquipeForm, id_usuario: e.target.value })}
+                            placeholder="Ex: 15"
+                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:border-blue-500 outline-none" />
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-slate-700 mb-1">Matrícula</label>
-                          <input type="text" value={matricula} onChange={e => setMatricula(e.target.value)} placeholder="PMT-2024-..." className="w-full px-4 py-2 border border-slate-300 rounded-lg" required />
+                          <input type="text" required value={addEquipeForm.matricula}
+                            onChange={(e) => setAddEquipeForm({ ...addEquipeForm, matricula: e.target.value })}
+                            placeholder="PMT-2024-..."
+                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:border-blue-500 outline-none" />
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-slate-700 mb-1">Cargo</label>
-                          <select value={cargo} onChange={e => setCargo(e.target.value)} className="w-full px-4 py-2 border border-slate-300 rounded-lg bg-white">
+                          <select value={addEquipeForm.cargo}
+                            onChange={(e) => setAddEquipeForm({ ...addEquipeForm, cargo: e.target.value })}
+                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:border-blue-500 outline-none">
                             <option value="Agente">Agente de Campo</option>
-                            <option value="Gestor">Gestor / Admin</option>
+                            <option value="Gestor">Gestor Municipal</option>
                           </select>
                         </div>
                       </div>
-                      <button type="submit" className="bg-blue-600 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-blue-700">
-                        Promover a Funcionário
+                      <button type="submit" disabled={isLoading}
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg font-medium transition-colors disabled:opacity-60 outline-none">
+                        {isLoading ? 'Promovendo...' : 'Promover a Funcionário'}
                       </button>
                     </form>
                   </div>
 
-                  <hr className="border-slate-200" />
-
-                  <div>
-                    <h3 className="text-lg font-bold text-red-600 mb-1">Remover Privilegios</h3>
-                    <p className="text-sm text-slate-500 mb-4">Remova o acesso de um funcionario. Ele voltara a ser um usuario comum.</p>
-                    <form onSubmit={handleRemover} className="bg-red-50 p-6 rounded-lg border border-red-100 flex items-end gap-4">
-                      <div className="flex-1 max-w-xs">
-                        <label className="block text-sm font-medium text-slate-700 mb-1">ID do Usuário</label>
-                        <input type="number" value={idRemover} onChange={e => setIdRemover(e.target.value)} placeholder="Ex: 15" className="w-full px-4 py-2 border border-slate-300 rounded-lg" required />
+                  <div className="bg-red-50 border border-red-100 rounded-2xl p-8 shadow-sm">
+                    <h3 className="text-lg font-bold text-red-700 mb-1">Remover Privilégios</h3>
+                    <p className="text-sm text-red-500/80 mb-6">O usuário voltará a ser um cidadão comum.</p>
+                    <form onSubmit={handleRemoverPrivilegios} className="flex items-end gap-4 max-w-sm">
+                      <div className="flex-1">
+                        <label className="block text-sm font-medium text-red-900 mb-1">ID do Usuário</label>
+                        <input type="number" required value={removerEquipeId}
+                          onChange={(e) => setRemoverEquipeId(e.target.value)}
+                          placeholder="Ex: 15"
+                          className="w-full px-4 py-2 border border-red-200 bg-white rounded-lg focus:border-red-500 outline-none" />
                       </div>
-                      <button type="submit" className="bg-red-600 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-red-700">
-                        Remover Acesso
+                      <button type="submit" disabled={isLoading}
+                        className="bg-red-600 hover:bg-red-700 text-white px-5 py-2 rounded-lg font-medium transition-colors disabled:opacity-60 outline-none">
+                        Remover
                       </button>
                     </form>
+                  </div>
+                </div>
+              )}
+
+              {/* ── Notificações ── */}
+              {activeTab === 'Notificacoes' && (
+                <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-sm max-w-2xl">
+                  <h3 className="text-lg font-bold text-slate-800 mb-1">Notificações por E-mail</h3>
+                  <p className="text-sm text-slate-500 mb-4">Escolha o que deseja receber por e-mail</p>
+                  <div className="divide-y divide-slate-100 border-b border-slate-100 mb-8">
+                    <Toggle label="Nova ocorrência registrada" checked={notifs.emailNovaOcorrencia} onChange={() => setNotifs({ ...notifs, emailNovaOcorrencia: !notifs.emailNovaOcorrencia })} />
+                    <Toggle label="Atualização de status" checked={notifs.emailStatus} onChange={() => setNotifs({ ...notifs, emailStatus: !notifs.emailStatus })} />
+                    <Toggle label="Relatório semanal" checked={notifs.emailRelatorio} onChange={() => setNotifs({ ...notifs, emailRelatorio: !notifs.emailRelatorio })} />
+                  </div>
+                  <h3 className="text-lg font-bold text-slate-800 mb-1">Notificações Push</h3>
+                  <div className="divide-y divide-slate-100">
+                    <Toggle label="Novas ocorrências" checked={notifs.pushNovas} onChange={() => setNotifs({ ...notifs, pushNovas: !notifs.pushNovas })} />
+                    <Toggle label="OS atribuída" checked={notifs.pushOS} onChange={() => setNotifs({ ...notifs, pushOS: !notifs.pushOS })} />
+                    <Toggle label="Alertas de prazo" checked={notifs.pushPrazo} onChange={() => setNotifs({ ...notifs, pushPrazo: !notifs.pushPrazo })} />
+                  </div>
+                </div>
+              )}
+
+              {/* ── Segurança ── */}
+              {activeTab === 'Seguranca' && (
+                <div className="max-w-2xl space-y-6">
+                  <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-sm">
+                    <h3 className="text-lg font-bold text-slate-800 mb-1">Alterar Senha</h3>
+                    <p className="text-sm text-slate-500 mb-6">Atualize sua senha de acesso</p>
+
+                    {erroSenha && <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">{erroSenha}</div>}
+                    {sucessoSenha && <div className="mb-4 p-3 bg-green-50 border border-green-200 text-green-700 rounded-lg text-sm">{sucessoSenha}</div>}
+
+                    <form onSubmit={handleAtualizarSenha} className="max-w-md space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Nova senha</label>
+                        <input type="password" required value={senhaForm.nova} minLength={6}
+                          onChange={(e) => setSenhaForm({ ...senhaForm, nova: e.target.value })}
+                          placeholder="Mín. 6 caracteres"
+                          className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:border-blue-500 outline-none" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Confirmar nova senha</label>
+                        <input type="password" required value={senhaForm.confirmar} minLength={6}
+                          onChange={(e) => setSenhaForm({ ...senhaForm, confirmar: e.target.value })}
+                          placeholder="Repita a nova senha"
+                          className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:border-blue-500 outline-none" />
+                      </div>
+                      <button type="submit" disabled={isLoading}
+                        className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg font-medium transition-colors disabled:opacity-60 outline-none">
+                        <Shield className="w-4 h-4" />
+                        {isLoading ? 'Atualizando...' : 'Atualizar Senha'}
+                      </button>
+                    </form>
+                  </div>
+                </div>
+              )}
+
+              {/* ── Aparência ── */}
+              {activeTab === 'Aparencia' && (
+                <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-sm max-w-2xl">
+                  <h3 className="text-lg font-bold text-slate-800 mb-1">Tema</h3>
+                  <p className="text-sm text-slate-500 mb-6">Selecione o tema de preferência</p>
+                  <div className="flex gap-4 mb-8">
+                    {[
+                      { key: 'Claro', Icon: Sun },
+                      { key: 'Escuro', Icon: Moon },
+                      { key: 'Sistema', Icon: Monitor },
+                    ].map(({ key, Icon }) => (
+                      <button key={key} onClick={() => handleMudarTema(key)}
+                        className={`relative flex flex-col items-center p-6 border-2 rounded-xl w-28 transition-all outline-none ${tema === key ? 'border-blue-500 bg-blue-50/30' : 'border-slate-200 hover:border-blue-200'}`}>
+                        {tema === key && (
+                          <div className="absolute top-2 right-2 w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
+                            <Check className="w-3 h-3 text-white" />
+                          </div>
+                        )}
+                        <Icon className={`w-7 h-7 mb-2 ${tema === key ? 'text-blue-500' : 'text-slate-400'}`} />
+                        <span className={`text-sm font-medium ${tema === key ? 'text-blue-700' : 'text-slate-600'}`}>{key}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <h3 className="text-lg font-bold text-slate-800 mb-1">Densidade</h3>
+                  <div className="flex bg-slate-100 p-1 rounded-lg w-fit mt-4">
+                    {['Compacto', 'Normal', 'Confortável'].map((d) => (
+                      <button key={d} onClick={() => setDensidade(d)}
+                        className={`px-4 py-2 text-sm font-medium rounded-md transition-all outline-none ${densidade === d ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`}>
+                        {d}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* ── Sistema ── */}
+              {activeTab === 'Sistema' && (
+                <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-sm max-w-2xl">
+                  <h3 className="text-lg font-bold text-slate-800 mb-5">Informações do Sistema</h3>
+                  <div className="border border-slate-200 rounded-xl overflow-hidden mb-8">
+                    {[
+                      ['Versão', 'v1.0.0'],
+                      ['Ambiente', 'Desenvolvimento'],
+                      ['Município', 'Três Lagoas - MS'],
+                      ['Tipo de conta', tipo],
+                    ].map(([k, v]) => (
+                      <div key={k} className="flex items-center justify-between p-4 border-b border-slate-100 last:border-b-0">
+                        <span className="text-sm text-slate-500">{k}</span>
+                        <span className="text-sm font-bold text-slate-800">{v}</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}

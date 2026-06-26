@@ -1,5 +1,5 @@
 from sqlalchemy import Column, String, Integer, Boolean, Float, ForeignKey, DateTime, Date, Enum
-from sqlalchemy.orm import declarative_base
+from sqlalchemy.orm import declarative_base, relationship
 from sqlalchemy.sql import func
 from datetime import datetime, timezone
 from passlib.context import CryptContext
@@ -15,9 +15,11 @@ class TipoUsuario(enum.Enum):
     Usuario = "Usuario"
     Admin = "Admin"
 
+
 class CargoFuncionario(enum.Enum):
     Agente = "Agente"
     Gestor = "Gestor"
+
 
 class Usuario(Base):
     __tablename__ = "usuario"
@@ -63,6 +65,12 @@ class Usuario(Base):
     
     def atualizar_senha(self, nova_senha_pura: str):
         self.senha_hash = self.gerar_hash_senha(nova_senha_pura)
+
+    # RELACIONAMENTOS DO USUARIO
+    ocorrencias = relationship("Ocorrencia", back_populates="usuario")
+    endereco = relationship("Endereco", back_populates="usuarios")
+    historicos_alterados = relationship("Historico_Ocorrencia", back_populates="alterado_por_usuario")
+    funcionario_perfil = relationship("Funcionario", back_populates="usuario", uselist=False)
             
     
 class Funcionario(Base):
@@ -77,9 +85,12 @@ class Funcionario(Base):
         self.matricula = matricula
         self.cargo = cargo
     
-    
-    
-          
+    # RELACIONAMENTOS DO FUNCIONARIO
+    usuario = relationship("Usuario", back_populates="funcionario_perfil")
+    ocorrencias_triadas = relationship("Ocorrencia", foreign_keys="[Ocorrencia.id_agente_triagem]", back_populates="agente_triagem")
+    ocorrencias_executadas = relationship("Ocorrencia", foreign_keys="[Ocorrencia.id_agente_execucao]", back_populates="agente_execucao")
+    ocorrencias_finalizadas = relationship("Ocorrencia", foreign_keys="[Ocorrencia.id_agente_finalizado]", back_populates="agente_finalizado")
+
         
 class Endereco(Base):
     __tablename__ = "endereco"
@@ -105,8 +116,11 @@ class Endereco(Base):
         self.latitude = latitude
         self.longitude = longitude
         self.fonte_localizacao = fonte_localizacao
-        
 
+     # RELACIONAMENTOS DO ENDERECO
+    usuarios = relationship("Usuario", back_populates="endereco")
+    bairro = relationship("Bairro", back_populates="enderecos")
+    ocorrencias = relationship("Ocorrencia", back_populates="endereco")
 
 
 class Bairro(Base):
@@ -114,12 +128,14 @@ class Bairro(Base):
     
     id = Column("id", Integer, primary_key=True, autoincrement=True)
     nome = Column("nome", String, nullable=False)
+    regiao = Column('regiao', String, default=None)
     
-    def __init__(self, nome):
+    def __init__(self, nome, regiao=None):
         self.nome = nome
-   
-   
-   
+        self.regiao = regiao
+     
+    enderecos = relationship("Endereco", back_populates="bairro")
+        
         
 class Ocorrencia(Base):
     __tablename__ = "ocorrencia"
@@ -161,6 +177,19 @@ class Ocorrencia(Base):
     def fechar_ocorrencia(self):
         self.status = "Finalizado"
         self.data_fechamento = datetime.now()
+
+    # RELACIONAMENTOS DA OCORRENCIA
+    usuario = relationship("Usuario", back_populates="ocorrencias")
+    endereco = relationship("Endereco", back_populates="ocorrencias")
+    historicos = relationship("Historico_Ocorrencia", back_populates="ocorrencia")
+    
+    # Como funcionário possui 3 chaves estrangeiras para ocorrência, definimos o mapeamento explícito com foreign_keys:
+    agente_triagem = relationship("Funcionario", foreign_keys=[id_agente_triagem], back_populates="ocorrencias_triadas")
+    agente_execucao = relationship("Funcionario", foreign_keys=[id_agente_execucao], back_populates="ocorrencias_executadas")
+    agente_finalizado = relationship("Funcionario", foreign_keys=[id_agente_finalizado], back_populates="ocorrencias_finalizadas")
+    
+    # Observação: Lembre-se de verificar se o modelo "Servico" possui a relação invertida correspondente caso use back_populates nele
+    servico = relationship("Servico") 
     
     
 class Historico_Ocorrencia(Base):
@@ -180,6 +209,10 @@ class Historico_Ocorrencia(Base):
         self.status_novo = status_novo
         self.mensagem = mensagem
         self.alterado_por = alterado_por
+    
+    # RELACIONAMENTOS DO HISTORICO
+    ocorrencia = relationship("Ocorrencia", back_populates="historicos")
+    alterado_por_usuario = relationship("Usuario", back_populates="historicos_alterados")
 
 
 class Servico(Base):

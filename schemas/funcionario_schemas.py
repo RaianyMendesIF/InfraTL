@@ -27,4 +27,18 @@ class Funcionario_Schema_remover_response(BaseModel):
 
     class Config:
         from_attributes = True 
-         
+
+class Funcionario_Schema_listar(BaseModel):
+    id_usuario: int
+    matricula: str
+    cargo: str
+    
+    class Config:
+        from_attributes = True
+
+class Funcionario_Schema_editar(BaseModel):
+    matricula: str
+    cargo: str
+    
+    class Config:
+        from_attributes = True    
